@@ -1599,28 +1599,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.insertBefore(alertBar, document.body.firstChild);
   }
 
-  // GASからプルダウン用のユニークな選択肢リストを取得する
-  // コードgs呼び出し
-  fetch(apiUrl, {
-    method: 'GET',
-    redirect: 'follow',
-    cache: 'no-store'
-  })
-  .then(response => {
-    // ネットワークエラー以外（404や500エラー等）を検知してエラーを投げる
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
-  })
-  .then(data => {
-  })
-  .catch(err => {
-    // 【失敗時の処理】 (withFailureHandler の中身)
-    console.error("プルダウンデータの取得に失敗しました:", err);
-    alert(`データの読み込みに失敗しました。\n時間をおいて再読み込みしてください。\n詳細: ${err.message}`)
-  });
-
+  // JSONファイルからプルダウンとカードデータを作成
+  loadInitialData();
   // 他に既存の初期化処理（最初のデータ読み込みなど）があればここに並べて記述してください
 
   const detailModal = document.getElementById("detail-modal");
