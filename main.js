@@ -1675,10 +1675,9 @@ function loadInitialData() {
     fetch('./data/cards.json').then(res => res.json()),
     fetch('./data/master.json').then(res => res.json())
   ])
-  .then(([cardData, masterData]) => {
+  .then(([cardData, options]) => {
     console.log("GitHubからのデータ取得成功");
-    if (masterData) {
-      const options = data.masterData;
+    if (options) {
       raceMapping = options.raceMap; // ここで保存
       keywords = options.keywords
       setupSearchDropdowns(options);
