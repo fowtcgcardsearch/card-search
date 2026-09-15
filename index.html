@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <!-- CSSの読み込み -->
+  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Force of Will カード検索</title>
+</head>
+
+<div id="selected-tags-chk-script" class="selected-tags-container"></div>
+<body data-is-dev="<?= isDev ?>">
+<div id="loading-overlay">
+  <div style="font-size: 20px;">データを準備しています</div>
+  <div style="margin-top: 10px;">少々お待ちください</div>
+</div>
+<button onclick="openKeywordModal()" class="floating-kw-btn" title="キーワード能力一覧">
+  📖
+</button>
+
+<div id="keyword-list-modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+  <div style="background-color: #fff; margin: 15% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 500px; max-height: 70vh; overflow-y: auto; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+    
+    <span onclick="closeKeywordModal()" style="position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer; color: #aaa;">&times;</span>
+    <h3 style="margin-top: 0; border-bottom: 2px solid #333; padding-bottom: 8px;">キーワード能力一覧</h3>
+    <div id="keyword-modal-content"></div>
+  </div>
+</div>
+
+
+<div class="tabs">
+  <div id="tab-basic" class="tab active" onclick="switchTab('basic')">基本検索</div>
+  <div id="tab-detailed" class="tab" onclick="switchTab('detailed')">詳細検索</div>
+  <div id="tab-import" class="tab" onclick="switchTab('import')">インポート検索</div>
+</div>
+
+<!-- 基本検索用のフォームエリア -->
+<div id="basic-search-form" class="search-container">
+  <input type="text" id="search-input" placeholder="キーワードを入力" onkeydown="if(event.key==='Enter') searchCards()">
+  <button id="search-btn" onclick="searchCards()">検索</button>
+</div>
+
+<!-- 詳細検索用のフォームエリア -->
+<div id="detailed-search-form" style="display:none; flex-direction: column; gap: 15px;">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0;">詳細検索</h3>
+      <button type="button" onclick="toggleDetailedForm()" class="toggle-btn">検索フォーム開閉</button>
+  </div>
+
+  <div id="detailed-inputs" style="display: flex; flex-direction: column; gap: 10px;">
+    <div class="form-group">
+      <label>キーワード</label>
+      <input type="text" id="det-text-input" placeholder="キーワードを入力" onkeydown="if(event.key==='Enter') searchDetailedCards()">
+      <label>検索モード</label>
+      <select id="det-search-mode" style="margin-bottom: 10px;">
+        <option value="exact">入力した通りの内容を含む</option>
+        <option value="fuzzy" selected>入力したすべての内容を含む(順不同)</option>
+        <option value="partial">入力した内容のいずれか1つ以上を含む</option>
+      </select>
+      <label>検索対象</label>
+      <div class="checkbox-group" style="margin-top:5px;">
+        <label><input type="checkbox" id="chk-name" checked> 名前</label>
+        <label><input type="checkbox" id="chk-text" checked> テキスト</label>
+        <label><input type="checkbox" id="chk-no"> カードNo</label>
+        <label><input type="checkbox" id="chk-flavor"> フレイバー</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>属性</label>
+      <div class="flat-checkbox-group">
+        <label class="chk-光"><input type="checkbox" class="chk-attri" id="chk-light" value="光"> 光</label>
+        <label class="chk-炎"><input type="checkbox" class="chk-attri" id="chk-fire" value="炎"> 炎</label>
+        <label class="chk-水"><input type="checkbox" class="chk-attri" id="chk-water" value="水"> 水</label>
+        <label class="chk-風"><input type="checkbox" class="chk-attri" id="chk-wind" value="風"> 風</label>
+        <label class="chk-闇"><input type="checkbox" class="chk-attri" id="chk-darkness" value="闇"> 闇</label>
+        <label class="chk-無"><input type="checkbox" class="chk-attri" id="chk-void" value="無"> 無</label>
+      </div>
+      <label>属性検索モード</label>
+      <select id="det-attri-mode" style="margin-bottom: 10px;">
+        <option value="any">選択した属性のいずれかを含む</option>
+        <option value="all">選択したすべての属性を含む</option>
+        <option value="only">選択した属性以外は含まない</option>
+        <option value="strict">選択したすべての属性と完全一致する</option>
+      </select>
+      <label>色構成</label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" id="color-single"> 単色(+無色)のみ検索</label>
+        <label><input type="checkbox" id="color-multi"> 多色のみ検索</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label text-muted">特性検索</label>
+      <div class="flat-checkbox-group">
+        <label class="chk-月"><input type="checkbox" class="chk-chara" id="chara-moon" value="月"> 月</label>
+        <label class="chk-時"><input type="checkbox" class="chk-chara" id="chara-time" value="時"> 時</label>
+        <label class="chk-無"><input type="checkbox" class="chk-chara" id="chara-void" value="無"> 無</label>
+        <label class="chk-無"><input type="checkbox" class="chk-chara" id="chara-x" value="X"> Ｘ</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>総コスト</label>
+      <div style="display: flex; gap: 5px; align-items: center;">
+        <select id="det-cost-op" style="width: 60px;">
+          <option value="gt">&gt;</option>
+          <option value="ge">≧</option>
+          <option value="eq" selected>=</option>
+          <option value="le">≦</option>
+          <option value="lt">&lt;</option>
+        </select>
+        <input type="number" id="det-total-cost" onkeydown="if(event.key==='Enter') searchDetailedCards()">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>神力</label>
+      <div style="display: flex; gap: 5px; align-items: center;">
+        <select id="det-divinity-op" style="width: 60px;">
+          <option value="gt">&gt;</option>
+          <option value="ge">≧</option>
+          <option value="eq" selected>=</option>
+          <option value="le">≦</option>
+          <option value="lt">&lt;</option>
+        </select>
+        <input type="text" id="det-divinity" placeholder="神力" oninput="this.value = this.value.replace(/[^0-9０-９∞]/g, '')" onkeydown="if(event.key==='Enter') searchDetailedCards()">
+      </div>
+    </div>
+    <div class="atk-def-row">
+      <div class="form-group">
+        <label>ATK</label>
+        <div class="atk-def-input-group">
+          <select id="det-atk-op">
+            <option value="gt">&gt;</option>
+            <option value="ge">≧</option>
+            <option value="eq" selected>=</option>
+            <option value="le">≦</option>
+            <option value="lt">&lt;</option>
+          </select>
+          <input type="number" id="det-atk" onkeydown="if(event.key==='Enter') searchDetailedCards()">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>DEF</label>
+        <div class="atk-def-input-group">
+          <select id="det-def-op">
+            <option value="gt">&gt;</option>
+            <option value="ge">≧</option>
+            <option value="eq" selected>=</option>
+            <option value="le">≦</option>
+            <option value="lt">&lt;</option>
+          </select>
+          <input type="number" id="det-def" onkeydown="if(event.key==='Enter') searchDetailedCards()">
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="filter-group">
+        <button type="button" class="accordion-header" onclick="toggleAccordion(this)">
+          カードタイプ ▼
+        </button>
+        <div id="selected-tags-chk-type" class="selected-tags-container"></div>
+        <div class="accordion-content" style="display: none;">
+          <input type="text" placeholder="絞り込み" onkeyup="filterCheckboxList(this, 'filter-container-cardtype')" style="width: 100%; margin-bottom: 8px; padding: 5px;">
+          <div id="filter-container-cardtype" class="checkbox-grid"></div>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="filter-group">
+        <button type="button" class="accordion-header" onclick="toggleAccordion(this)">
+          種族 ▼
+        </button>
+        <div id="selected-tags-chk-race" class="selected-tags-container"></div>
+        <div class="accordion-content" style="display: none;">
+          <input type="text" placeholder="絞り込み" onkeyup="filterCheckboxList(this, 'filter-container-race')" style="width: 100%; margin-bottom: 8px; padding: 5px;">
+          <div id="filter-container-race" class="checkbox-grid"></div>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="filter-group">
+        <button type="button" class="accordion-header" onclick="toggleAccordion(this)">
+          収録弾 ▼
+        </button>
+        <div id="selected-tags-chk-exp" class="selected-tags-container"></div>
+        <div class="accordion-content" style="display: none;">
+          <input type="text" placeholder="絞り込み" onkeyup="filterCheckboxList(this, 'filter-container-expansion')" style="width: 100%; margin-bottom: 8px; padding: 5px;">
+          <div id="filter-container-expansion" class="checkbox-grid"></div>
+        </div>
+      </div>
+      <div class="checkbox-group" style="margin-top:5px;">
+        <label><input type="checkbox" id="chk-paradox" >パラドックスカードのみ表示</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="filter-group">
+        <button type="button" class="accordion-header" onclick="toggleAccordion(this)">
+          レアリティ ▼
+        </button>
+        <div id="selected-tags-chk-rarity" class="selected-tags-container"></div>
+        <div class="accordion-content" style="display: none;">
+          <input type="text" placeholder="絞り込み" onkeyup="filterCheckboxList(this, 'filter-container-rarity')" style="width: 100%; margin-bottom: 8px; padding: 5px;">
+          <div id="filter-container-rarity" class="checkbox-grid"></div>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="filter-group">
+        <button type="button" class="accordion-header" onclick="toggleAccordion(this)">
+          イラストレーター ▼
+        </button>
+        <div id="selected-tags-chk-illustrator" class="selected-tags-container"></div>
+        <div class="accordion-content" style="display: none;">
+          <input type="text" placeholder="絞り込み" onkeyup="filterCheckboxList(this, 'filter-container-illustrator')" style="width: 100%; margin-bottom: 8px; padding: 5px;">
+          <div id="filter-container-illustrator" class="checkbox-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 15px; display: flex; gap: 10px;">
+    <button type="button" onclick="searchDetailedCards()" class="search-btn" style="flex: 2;">検索を実行</button>
+    <button type="button" onclick="resetDetailedSearch()" class="reset-btn" style="flex: 1;">条件初期化</button>
+  </div>
+</div>
+
+<!-- インポート検索用のフォームエリア -->
+<div id="import-search-form" style="display:none; flex-direction: column; gap: 15px;">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0;">インポート検索</h3>
+      <button type="button" onclick="toggleImportForm()" class="toggle-btn">検索フォーム開閉</button>
+  </div>
+  <div id="import-inputs" style="display: flex; flex-direction: column; gap: 10px;">
+    <div class="form-group">
+      <textarea id="import-text-input" rows="10" placeholder="使い方&#10;1.Force of Windから対象のデッキを開き、リスト下の「Export to TCG Arena」をクリック&#10;2.表示されたリストを全選択してコピーし、ここに貼り付けて検索" style="width: 100%;"></textarea>
+    </div>
+  </div>
+  <div id="import-warning-area" style="color: #ef4444; font-size: 13px; margin: 8px 0; font-weight: bold;"></div>
+  <div style="margin-top: 0; display: flex; gap: 10px;">
+    <button onclick="searchImportedCards()" class="search-btn" style="flex: 1;">リストから検索</button>
+  </div>
+</div>
+
+<!-- 検索結果の表示エリア -->
+<div id="controls-bar" class="controls-container" style="flex-direction: column; gap: 10px;">
+  <!-- 1行目：左寄せグループと右寄せグループ -->
+  <div class="controls-row">
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+      <div class="page-size-selector">
+        <span id="search-count" style="margin-right: 15px; font-weight: bold; color: #475569;">検索結果: 0件</span>
+        <span id="page-size-select-wrapper">
+          表示件数:
+          <select id="page-size-select" onchange="changePageSize()">
+            <option value="30" selected>30件</option>
+            <option value="50">50件</option>
+            <option value="100">100件</option>
+            <option value="all">全件</option>
+          </select>
+        </span>
+      </div>
+      
+      <!-- 右寄せ用 -->
+      <div class="sort-selector">
+        並び替え:
+        <select id="sort-select" onchange="applySort()">
+          <option value="date-desc" selected>発売日が新しい順</option>
+          <option value="date-asc">発売日が古い順</option>
+          <option value="name-asc">英語名ABC順</option>
+          <option value="name-desc">英語名逆順</option>
+          <option value="cost-asc">総コストが小さい順</option>
+          <option value="cost-desc">総コストが大きい順</option>
+          <option value="atk-asc">ATKが小さい順</option>
+          <option value="atk-desc">ATKが大きい順</option>
+          <option value="def-asc">DEFが小さい順</option>
+          <option value="def-desc">DEFが大きい順</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <!-- 2行目：ページネーション（中央寄せ） -->
+  <div id="pagination" class="pagination-container" style="display: flex; justify-content: center;"></div>
+  <div style="margin-top: 10px;">
+    <label style="cursor: pointer;">
+      <input type="checkbox" id="toggle-card-en-text" onchange="toggleTextVisibility()">
+      検索結果に英語テキストを表示する
+    </label>
+    <label style="cursor: pointer;">
+      <input type="checkbox" id="toggle-card-jp-text" onchange="toggleTextVisibility()">
+      検索結果に日本語テキストを表示する
+    </label>
+  </div>
+</div>
+
+<div id="card-list">
+  <p class="info-msg">検索ワードを入力して「検索」ボタンを押してください。</p>
+</div>
+
+<div id="footer-controls-bar" class="footer-controls-container">
+  <div id="footer-pagination" class="pagination-container"></div>
+</div>
+
+<div id="detail-modal" class="modal-overlay">
+  <div class="modal-content">
+    <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+    <!-- ↓ ナビゲーション用のエリアを追加 -->
+    <div id="modal-nav" class="modal-nav-container"></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- JavaScriptの読み込み -->
+<script src="main.js"></script>
+</body>
+</html>
