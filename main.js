@@ -1614,33 +1614,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return response.json();
   })
   .then(data => {
-    const options = data.masterData;
-    raceMapping = options.raceMap; // ここで保存
-    keywords = options.keywords
-    setupSearchDropdowns(options);
-    expansionRelations = options.expRelations || {};
-
-    // 色構成チェックの排他制御
-    const singleChk = document.getElementById('color-single');
-    const multiChk = document.getElementById('color-multi');
-
-    // 単色のみがチェックされたら、多色のみを外す
-    singleChk.addEventListener('change', () => {
-      if (singleChk.checked) {
-        multiChk.checked = false;
-      }
-    });
-    // 多色のみがチェックされたら、単色のみを外す
-    multiChk.addEventListener('change', () => {
-      if (multiChk.checked) {
-        singleChk.checked = false;
-      }
-    });
-    restoreSearchConditionsFromCache();
-    // カードデータ読み込み処理の追加
-    if(data.cardData){
-      loadCardData(data.cardData);  
-    }
   })
   .catch(err => {
     // 【失敗時の処理】 (withFailureHandler の中身)
@@ -1712,6 +1685,50 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+/**
+* 初期処理にてjsonファイルを読み込む
+*/
+function loadInitialData() {
+  // 自ドメイン（GitHub Pages）内の JSON ファイルを相対パスで取得
+  Promise.all([
+    fetch('./data/cards.json').then(res => res.json()),
+    fetch('./data/master.json').then(res => res.json())
+  ])
+  .then(([cardData, masterData]) => {
+    console.log("GitHubからのデータ取得成功");
+    if (masterData) {
+      const options = data.masterData;
+      raceMapping = options.raceMap; // ここで保存
+      keywords = options.keywords
+      setupSearchDropdowns(options);
+      expansionRelations = options.expRelations || {};
+  
+      // 色構成チェックの排他制御
+      const singleChk = document.getElementById('color-single');
+      const multiChk = document.getElementById('color-multi');
+  
+      // 単色のみがチェックされたら、多色のみを外す
+      singleChk.addEventListener('change', () => {
+        if (singleChk.checked) {
+          multiChk.checked = false;
+        }
+      });
+      // 多色のみがチェックされたら、単色のみを外す
+      multiChk.addEventListener('change', () => {
+        if (multiChk.checked) {
+          singleChk.checked = false;
+        }
+      });
+      restoreSearchConditionsFromCache();
+    }
+    if (cardData) loadCardData(cardData);
+  })
+  .catch(err => {
+    console.error("データ読み込みエラー:", err);
+    alert("データの読み込みに失敗しました。");
+  });
+}
 
 /**
  * URLのパス情報から該当するカードの uid を特定する
