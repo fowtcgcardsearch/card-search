@@ -64,8 +64,6 @@ function loadCardData(data) {
 
   // データ準備完了後、保存されたセッション状態を復元して検索を実行
   restoreSearchSession();
-  // ※カードデータ（allCards）の読み込み完了後に実行する必要があります
-  initAppWithUrlPath();
 }
 
 /** 
@@ -311,8 +309,6 @@ function searchCards(isRestoring = false) {
     });
   }
   displayCards();
-  // 履歴の追加（復元時でなければ push する）
-  if(!isRestoring) pushHistoryState({ activeDetailCardId: null });
 }
 
 /**
@@ -463,8 +459,6 @@ function searchDetailedCards(isRestoring = false) {
   // 最後に検索フォームを閉じる
   document.getElementById('detailed-inputs').style.display = 'none';
   displayCards();
-  // 履歴の追加（復元時でなければ push する）
-  if(!isRestoring) pushHistoryState({ activeDetailCardId: null });
 }
 
 /**
@@ -537,9 +531,6 @@ function searchImportedCards(isRestoring = false) {
 
   filteredCards = [...primaryCards, ...extraCards];
   displayCards();
-
-  // 履歴の追加（復元時でなければ push する）
-  if(!isRestoring) pushHistoryState({ activeDetailCardId: null });
 }
 
 /**
@@ -914,7 +905,7 @@ function getAttriBadgeHtml(attriArray) {
 /**
  * カード詳細画面のモジュール表示
  */
-function openDetail(cardId, skipPush = false) {
+function openDetail(cardId) {
   // セッションにカードIDを保存
   sessionStorage.setItem('activeDetailCardId', cardId);
   const targetCard = allCards.find(c => c.uid === cardId);
@@ -1192,11 +1183,6 @@ function openDetail(cardId, skipPush = false) {
   document.getElementById("detail-modal").style.display = "flex";
   // スクロールをトップに戻す
   document.querySelector(".modal-content").scrollTop = 0; 
-
-  // 履歴の追加（復元時でなければ push する）
-  if (!skipPush) {
-    pushHistoryState({ activeDetailCardId: cardId });
-  }
 }
 
 /**
@@ -1286,7 +1272,7 @@ function renderKeywordTooltips(cardText) {
 /**
  * 詳細画面を閉じる
  */
-function closeModal(skipPush = false) {
+function closeModal() {
   document.getElementById("detail-modal").style.display = "none";
   // 元の画面のスクロールを許可する
   // 1. bodyの固定を解除
@@ -1298,10 +1284,6 @@ function closeModal(skipPush = false) {
   window.scrollTo(0, parseInt(scrollY || '0') * -1);
   // セッションのカードID情報を削除
   sessionStorage.removeItem('activeDetailCardId');
-  // 履歴の追加（復元時でなければ push する）
-  if (!skipPush) {
-    pushHistoryState({ activeDetailCardId: null });
-  }
 }
 
 /**
@@ -1340,7 +1322,7 @@ function searchByProperty(propertyName, value) {
   searchDetailedCards();
   
   // モーダルを閉じる
-  closeModal(true);
+  closeModal();
   
   // 背景の固定を解除（※closeDetailで行っている処理と同じものを実行）
   document.body.style.position = '';
@@ -1454,7 +1436,7 @@ function searchByPropertyEncoded(type, encodedValue) {
 /**
  * ソートを実行して表示を更新
  */
-function applySort(skipPush = false) {
+function applySort() {
   const sortValue = document.getElementById("sort-select").value;
   const currentIds = new Set(filteredCards.map(c => c.uid));
   filteredCards = allCards.filter(c => currentIds.has(c.uid));
@@ -1479,10 +1461,6 @@ function applySort(skipPush = false) {
 
   currentPage = 1;
   displayCards();
-  // 履歴の追加（復元時でなければ push する）
-  if (!skipPush) {
-    pushHistoryState({ activeDetailCardId: null });
-  }
 }
 
 /**
@@ -1566,24 +1544,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.body.style.position !== 'fixed') {
       sessionStorage.setItem('scrollY', window.scrollY || document.documentElement.scrollTop);
     }
-  });
-
-  // ★(課題3の解決) 初回ロード時に replaceState を実行し、null state を防止
-  const initialState = getCurrentState();
-  history.replaceState(initialState, '');
-  sessionStorage.setItem('lastAppState', JSON.stringify(initialState));
-
-  // ソートや表示件数が変更された時も履歴に追加する
-  document.getElementById('sort-select')?.addEventListener('change', () => {
-    currentPage = 1; // ソート変更時は1ページ目に戻す
-    pushHistoryState();
-    searchCards(true); // 検索再実行
-  });
-
-  document.getElementById('page-size-select')?.addEventListener('change', () => {
-    currentPage = 1;
-    pushHistoryState();
-    searchCards(true);
   });
 
   // 現在のURLを取得
@@ -1708,88 +1668,6 @@ function loadInitialData() {
     alert("データの読み込みに失敗しました。");
   });
 }
-
-/**
- * URLのパス情報から該当するカードの uid を特定する
- * @param {string} pathInfo - 例: "QSK-001" や "QSK-001_2"
- * @returns {string|null} 対象カードの uid
- */
-function findCardUidFromPath(pathInfo) {
-  if (!pathInfo) return null;
-
-  // アンダースコアで分割（例: "QSK-001_2" -> ["QSK-001", "2"]）
-  const parts = pathInfo.split('_');
-  const targetCardNo = parts[0].trim();
-  
-  // 指定の番号があればインデックス化（1始まりを0始まりに変換）。未指定・不正値は 0 (1枚目)
-  let targetIndex = parts[1] ? parseInt(parts[1], 10) - 1 : 0;
-  if (isNaN(targetIndex) || targetIndex < 0) {
-    targetIndex = 0;
-  }
-
-  // カードNo（cardNo または id 等の該当プロパティ）で一致するカードをフィルタリング
-  const matchedCards = allCards.filter(c => c.id === targetCardNo);
-
-  if (matchedCards.length === 0) {
-    return null; // ヒットなし
-  }
-
-  // 指定されたインデックスが存在しない場合は1枚目（0番目）を採用
-  if (targetIndex >= matchedCards.length) {
-    targetIndex = 0;
-  }
-
-  return matchedCards[targetIndex].uid;
-}
-
-function initAppWithUrlPath() {
-  const initialPath = document.body.getAttribute('initial_path_info');
-
-  if (!initialPath) return;
-
-  const targetUid = findCardUidFromPath(initialPath);
-  if (targetUid) {
-    // 初回表示のため、履歴スタックを荒らさないよう skipPush = true で開く
-    openDetail(targetUid, true);
-  }
-}
-
-
-/**
- *  ブラウザの「戻る / 進む」イベント処理
- */
-window.addEventListener('popstate', (event) => {
-  // ★(課題3の解決) event.state が null の場合は SessionStorage から復元を試みる
-  let state = event.state;
-  if (!state) {
-    const saved = sessionStorage.getItem('lastAppState');
-    if (saved) {
-      try { state = JSON.parse(saved); } catch(e) {}
-    }
-  }
-
-  // それでも state が取れない場合は処理をスキップ（画面真っ白を防止）
-  if (!state) return;
-
-  // 1. タブの切り替え (※履歴追加を伴わない切り替え関数を想定)
-  if (typeof switchTab === 'function') switchTab(state.activeTab || 'basic', true);
-
-  // 2. プルダウンや入力フォームの復元
-  restoreFormValues(state);
-
-  // 3. 画面の再描画 (isRestoring = true で呼び出し)
-  if (state.activeTab === 'basic') searchCards(true);
-  else if (state.activeTab === 'detailed') searchDetailedCards(true);
-  else if (state.activeTab === 'import') searchImportedCards(true);
-
-  // 4. モーダルの表示切替 (skipPush = true)
-  if (state.activeDetailCardId) {
-    openDetail(state.activeDetailCardId, true);
-  } else {
-    closeModal(true);
-  }
-});
-
 
 /**
  * キーボード（Escキー）でモーダルを閉じるイベントリスナー
@@ -2187,138 +2065,3 @@ window.addEventListener("scroll", function() {
 window.addEventListener("resize", function() {
   hideKeywordTooltip();
 });
-
-/**
- * 現在の画面状態をブラウザの履歴に追加する
- */
-function pushHistoryState(extraState = {}) {
-  const currentState = {
-    activeTab: sessionStorage.getItem('activeSearchTab') || 'basic',
-    basicKeyword: document.getElementById('search-input')?.value || "",
-    importList: document.getElementById('import-text-input')?.value || "",
-    detailedForm: getDetailedFormValues(), // フォームの値をオブジェクト化する関数
-    
-    // チェックボックス群
-    chkType: Array.from(document.querySelectorAll('.chk-type:checked')).map(el => el.value),
-    chkRace: Array.from(document.querySelectorAll('.chk-race:checked')).map(el => el.value),
-    chkExp: Array.from(document.querySelectorAll('.chk-exp:checked')).map(el => el.value),
-    chkRarity: Array.from(document.querySelectorAll('.chk-rarity:checked')).map(el => el.value),
-    chkIllustrator: Array.from(document.querySelectorAll('.chk-illustrator:checked')).map(el => el.value),
-
-    // 表示系
-    pageSize: document.getElementById('page-size-select')?.value || "30",
-    sortSelect: document.getElementById('sort-select')?.value || "date-desc",
-    currentPage: currentPage || 1,
-
-    // 詳細モーダルが開いているか（開いている場合は cardUid）
-    activeDetailCardId: extraState.activeDetailCardId || null
-  };
-
-  // 履歴に追加
-  history.pushState(currentState, '');
-
-  const state = getCurrentState(extraState);
-  // 再読み込み対策として SessionStorage にも最新状態を退避
-  sessionStorage.setItem('lastAppState', JSON.stringify(state));
-}
-
-/**
- * 現在の画面状態をオブジェクトとして取得
- */
-function getCurrentState(extraState = {}) {
-  return {
-    activeTab: sessionStorage.getItem('activeSearchTab') || 'basic',
-    basicKeyword: document.getElementById('search-input')?.value || "",
-    importList: document.getElementById('import-text-input')?.value || "",
-    detailedForm: getDetailedFormValues(),
-
-    // ソート・ページネーション・件数
-    pageSize: document.getElementById('page-size-select')?.value || "30",
-    sortSelect: document.getElementById('sort-select')?.value || "date-desc",
-    currentPage: typeof currentPage !== 'undefined' ? currentPage : 1,
-
-    // 詳細モーダル表示状態
-    activeDetailCardId: extraState.activeDetailCardId !== undefined 
-      ? extraState.activeDetailCardId 
-      : (document.getElementById('card-detail-modal')?.style.display === 'block' ? currentDetailCardUid : null)
-  };
-}
-
-/**
- * 詳細検索フォーム内の全入力値をオブジェクトとして取得する
- */
-function getDetailedFormValues() {
-  return {
-    name: document.getElementById('search-detailed-name')?.value || "",
-    effect: document.getElementById('search-detailed-effect')?.value || "",
-    illustrator: document.getElementById('search-detailed-illustrator')?.value || "",
-    costMin: document.getElementById('search-detailed-cost-min')?.value || "",
-    costMax: document.getElementById('search-detailed-cost-max')?.value || "",
-    powerMin: document.getElementById('search-detailed-power-min')?.value || "",
-    powerMax: document.getElementById('search-detailed-power-max')?.value || "",
-    counterMin: document.getElementById('search-detailed-counter-min')?.value || "",
-    counterMax: document.getElementById('search-detailed-counter-max')?.value || "",
-    // チェックボックス群（配列で保持）
-    chkType: Array.from(document.querySelectorAll('.chk-type:checked')).map(el => el.value),
-    chkColor: Array.from(document.querySelectorAll('.chk-color:checked')).map(el => el.value),
-    chkFeature: Array.from(document.querySelectorAll('.chk-feature:checked')).map(el => el.value),
-    chkRarity: Array.from(document.querySelectorAll('.chk-rarity:checked')).map(el => el.value)
-  };
-}
-
-/**
- * 詳細検索フォームの値を復元する関数
- */
-function restoreDetailedFormValues(values) {
-  if (!values) return;
-  
-  if (document.getElementById('search-detailed-name')) document.getElementById('search-detailed-name').value = values.name || "";
-  if (document.getElementById('search-detailed-effect')) document.getElementById('search-detailed-effect').value = values.effect || "";
-  if (document.getElementById('search-detailed-illustrator')) document.getElementById('search-detailed-illustrator').value = values.illustrator || "";
-  
-  // チェックボックスの復元
-  const checkGroups = [
-    { selector: '.chk-type', data: values.chkType },
-    { selector: '.chk-color', data: values.chkColor },
-    { selector: '.chk-feature', data: values.chkFeature },
-    { selector: '.chk-rarity', data: values.chkRarity }
-  ];
-
-  checkGroups.forEach(group => {
-    document.querySelectorAll(group.selector).forEach(chk => {
-      chk.checked = group.data ? group.data.includes(chk.value) : false;
-    });
-  });
-}
-
-/**
- * State オブジェクトからフォーム・プルダウンの表示を復元
- */
-function restoreFormValues(state) {
-  if (!state) return;
-
-  // 1. 基本検索キーワード
-  if (document.getElementById('search-input') && state.basicKeyword !== undefined) {
-    document.getElementById('search-input').value = state.basicKeyword;
-  }
-
-  // 2. 詳細検索フォーム
-  if (state.detailedForm) {
-    restoreDetailedFormValues(state.detailedForm);
-  }
-
-  // 3. ソート順プルダウンの復元 ★(課題1の解決)
-  if (document.getElementById('sort-select') && state.sortSelect) {
-    document.getElementById('sort-select').value = state.sortSelect;
-  }
-
-  // 4. 表示件数プルダウンの復元
-  if (document.getElementById('page-size-select') && state.pageSize) {
-    document.getElementById('page-size-select').value = state.pageSize;
-  }
-
-  // 5. ページ番号の復元 ★(課題2の解決)
-  if (state.currentPage) {
-    currentPage = state.currentPage;
-  }
-}
