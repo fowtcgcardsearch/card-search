@@ -309,13 +309,20 @@ function initAutoUpdateCheck() {
       // 60秒（1分）ごとに更新がないかチェックを開始
       setInterval(checkForUpdates, 60000);
     });
+
+    // スマホでアプリ画面に戻ってきた（復帰した）瞬間を検知して即座にチェック
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        console.log("アプリに復帰しました。更新をチェックします。");
+        checkForUpdates();
+      }
+    });
 }
 
 /**
  * JSONの更新をチェックする関数（超軽量）
  */
 function checkForUpdates() {
-  console.log("test")
   // HEADリクエストでヘッダー情報（ETag）だけを取得（JSON本体はダウンロードしない）
   fetch('./data/cards.json', { method: 'HEAD', cache: 'no-cache' })
     .then(res => {
