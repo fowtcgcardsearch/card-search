@@ -2098,81 +2098,82 @@ function restoreSearchSession() {
 // ------------------------------------------------------------------------------------------------------------------
 
 /**
- * 現在の検索条件・タブ・ソート・ページ数をURLに反映
+ * 現在の検索条件・タブ・ソート・ページ数を圧縮してURLに反映
  */
 function updateUrlParams(skipHistory = false) {
-  const url = new URL(window.location.href);
-  const params = url.searchParams;
+  const params = new URLSearchParams();
 
-  // アクティブなタブ
-  const activeTab = document.querySelector('.tab.active')?.id.replace('tab-', '') || 'basic';
-  params.set('tab', activeTab);
+  // 1. URLに乗せたい状態オブジェクトを作成
+  const state = {
+    tab: document.querySelector('.tab.active')?.id.replace('tab-', '') || 'basic',
+    size: document.getElementById("page-size-select")?.value || '30',
+    sort: document.getElementById("sort-select")?.value || 'date-desc',
+    p: currentPage
+  };
 
-  // 共通設定
-  const pageSize = document.getElementById("page-size-select")?.value;
-  if (pageSize) url.searchParams.set('size', pageSize);
-  const sortVal = document.getElementById("sort-select")?.value;
-  if (sortVal) params.set('sort', sortVal);
-  params.set('p', currentPage);
+  if (state.tab === 'basic') {
+    state.q = document.getElementById("search-input")?.value || '';
+  } else if (state.tab === 'detailed') {
+    state.dq = document.getElementById('det-text-input')?.value || '';
+    state.sm = document.getElementById('det-search-mode')?.value;
+    
+    // ターゲット設定
+    state.targets = [
+      document.getElementById('chk-name')?.checked ? 'name' : '',
+      document.getElementById('chk-text')?.checked ? 'text' : '',
+      document.getElementById('chk-no')?.checked ? 'no' : '',
+      document.getElementById('chk-flavor')?.checked ? 'flavor' : ''
+    ].filter(Boolean);
 
-  if (activeTab === 'basic') {
-    const q = document.getElementById("search-input")?.value || '';
-    if (q) params.set('q', q); else params.delete('q');
-  } else if (activeTab === 'detailed') {
-    // 詳細検索のパラメータ設定
-    const setParam = (key, value) => { if (value) params.set(key, value); else params.delete(key); };
+    // 属性・色
+    state.attri = Array.from(document.querySelectorAll('.chk-attri:checked')).map(el => el.value);
+    state.am = document.getElementById('det-attri-mode')?.value;
+    if (document.getElementById('color-single')?.checked) state.color = 'single';
+    if (document.getElementById('color-multi')?.checked) state.color = 'multi';
 
-    setParam('dq', document.getElementById('det-text-input')?.value);
-    setParam('sm', document.getElementById('det-search-mode')?.value);
+    // コスト・ステータス
+    state.chara = Array.from(document.querySelectorAll('.chk-chara:checked')).map(el => el.value);
+    state.cost = document.getElementById('det-total-cost')?.value || '';
+    state.costOp = document.getElementById('det-cost-op')?.value;
+    state.div = document.getElementById('det-divinity')?.value || '';
+    state.divOp = document.getElementById('det-divinity-op')?.value;
+    state.atk = document.getElementById('det-atk')?.value || '';
+    state.atkOp = document.getElementById('det-atk-op')?.value;
+    state.def = document.getElementById('det-def')?.value || '';
+    state.defOp = document.getElementById('det-def-op')?.value;
 
-    // チェックボックス群
-    const chkName = document.getElementById('chk-name')?.checked;
-    const chkText = document.getElementById('chk-text')?.checked;
-    const chkNo = document.getElementById('chk-no')?.checked;
-    const chkFlavor = document.getElementById('chk-flavor')?.checked;
-    setParam('targets', [chkName ? 'name' : '', chkText ? 'text' : '', chkNo ? 'no' : '', chkFlavor ? 'flavor' : ''].filter(Boolean).join(','));
+    // 複数選択チェックボックス群
+    const getChecked = (cls) => Array.from(document.querySelectorAll(`.${cls}:checked`)).map(el => el.value);
+    state.types = getChecked('chk-type');
+    state.races = getChecked('chk-race');
+    state.exps = getChecked('chk-exp');
+    state.rarities = getChecked('chk-rarity');
+    state.illus = getChecked('chk-illustrator');
+    state.paradox = document.getElementById('chk-paradox')?.checked ? 1 : 0;
 
-    const attris = Array.from(document.querySelectorAll('.chk-attri:checked')).map(el => el.value);
-    setParam('attri', attris.join(','));
-    setParam('am', document.getElementById('det-attri-mode')?.value);
-
-    if (document.getElementById('color-single')?.checked) params.set('color', 'single');
-    else if (document.getElementById('color-multi')?.checked) params.set('color', 'multi');
-    else params.delete('color');
-
-    const charas = Array.from(document.querySelectorAll('.chk-chara:checked')).map(el => el.value);
-    setParam('chara', charas.join(','));
-
-    // ステータス検索
-    setParam('cost', document.getElementById('det-total-cost')?.value);
-    setParam('costOp', document.getElementById('det-cost-op')?.value);
-    setParam('div', document.getElementById('det-divinity')?.value);
-    setParam('divOp', document.getElementById('det-divinity-op')?.value);
-    setParam('atk', document.getElementById('det-atk')?.value);
-    setParam('atkOp', document.getElementById('det-atk-op')?.value);
-    setParam('def', document.getElementById('det-def')?.value);
-    setParam('defOp', document.getElementById('det-def-op')?.value);
-
-    // 複数選択リスト
-    const getChecked = (cls) => Array.from(document.querySelectorAll(`.${cls}:checked`)).map(el => el.value).join(',');
-    setParam('types', getChecked('chk-type'));
-    setParam('races', getChecked('chk-race'));
-    setParam('exps', getChecked('chk-exp'));
-    setParam('rarities', getChecked('chk-rarity'));
-    setParam('illus', getChecked('chk-illustrator'));
-
-    if (document.getElementById('chk-paradox')?.checked) params.set('paradox', '1');
-    else params.delete('paradox');
-  } else if (activeTab === 'import') {
-    const importText = document.getElementById('import-text-input')?.value || '';
-    if (importText) params.set('import', importText); else params.delete('import');
+  } else if (state.tab === 'import') {
+    state.import = document.getElementById('import-text-input')?.value || '';
   }
 
-  // 履歴更新の判定
+  // 2. JSON化 ➔ LZStringでURL安全な圧縮文字列に変換
+  const jsonString = JSON.stringify(state);
+  // compressToEncodedURIComponent を使うとURLで安全に使用できる形式になります
+  const compressed = LZString.compressToEncodedURIComponent(jsonString);
+
+  params.set('d', compressed);
+
+  // モーダルで開いているカードがあれば単体で付与（人間が読めるように外出しを推奨）
+  const currentCardParam = new URLSearchParams(window.location.search).get('card');
+  if (currentCardParam) {
+    params.set('card', currentCardParam);
+  }
+
+  // 3. 履歴更新
+  const newUrl = `${window.location.pathname}?${params.toString()}`;
   if (!skipHistory) {
-    history.pushState(null, '', url.toString());
+    history.pushState(null, '', newUrl);
   } else {
-    history.replaceState(null, '', url.toString());
+    history.replaceState(null, '', newUrl);
   }
 }
 
@@ -2181,95 +2182,105 @@ function updateUrlParams(skipHistory = false) {
  */
 function handleUrlState() {
   const params = new URLSearchParams(window.location.search);
-  const tab = params.get('tab') || 'basic';
-  
-  // タブ切り替え（表示制御のみ）
-  switchTab(tab);
+  const compressedData = params.get('d');
 
-  const sizeParam = params.get('size');
-  const sortParam = params.get('sort');
-  const pageParam = params.get('p');
-
-  //if(!sizeParam || !sortParam || !pageParam) return;
-
-  // 表示件数とソートとページの復元
-  if (sizeParam && document.getElementById("page-size-select")) {
-    document.getElementById("page-size-select").value = sizeParam;
-  }
-  if (sortParam && document.getElementById("sort-select")) {
-    document.getElementById("sort-select").value = sortParam;
-  }
-  if (pageParam) {
-    currentPage = parseInt(pageParam, 10) || 1;
+  if (!compressedData) {
+    // パラメータがない場合は初期設定（必要に応じて記述）
+    switchTab('basic');
+    return;
   }
 
-  if (tab === 'basic' && sizeParam && sortParam && pageParam) {
-    const q = params.get('q') || '';
-    document.getElementById("search-input").value = q;
+  let state = null;
+  try {
+    // 1. デコード・解凍 ➔ JSONパース
+    const jsonString = LZString.decompressFromEncodedURIComponent(compressedData);
+    if (jsonString) {
+      state = JSON.parse(jsonString);
+    }
+  } catch (e) {
+    console.error("URLデータの復元に失敗しました:", e);
+    return;
+  }
+
+  if (!state) return;
+
+  // 2. 基本項目の復元
+  switchTab(state.tab || 'basic');
+  if (state.size && document.getElementById("page-size-select")) {
+    document.getElementById("page-size-select").value = state.size;
+  }
+  if (state.sort && document.getElementById("sort-select")) {
+    document.getElementById("sort-select").value = state.sort;
+  }
+  currentPage = state.p || 1;
+
+  // 3. タブごとの詳細復元
+  if (state.tab === 'basic') {
+    document.getElementById("search-input").value = state.q || '';
     searchCards(true);
-  } else if (tab === 'detailed' && sizeParam && sortParam && pageParam) {
-    // 各項目の復元
-    document.getElementById('det-text-input').value = params.get('dq') || '';
-    if (params.get('sm')) document.getElementById('det-search-mode').value = params.get('sm');
 
-    const targets = (params.get('targets') || 'name,text').split(',');
+  } else if (state.tab === 'detailed') {
+    document.getElementById('det-text-input').value = state.dq || '';
+    if (state.sm) document.getElementById('det-search-mode').value = state.sm;
+
+    // ターゲット復元
+    const targets = state.targets || [];
     document.getElementById('chk-name').checked = targets.includes('name');
     document.getElementById('chk-text').checked = targets.includes('text');
     document.getElementById('chk-no').checked = targets.includes('no');
     document.getElementById('chk-flavor').checked = targets.includes('flavor');
 
-    const attris = (params.get('attri') || '').split(',').filter(Boolean);
+    // 属性・色
+    const attris = state.attri || [];
     document.querySelectorAll('.chk-attri').forEach(cb => cb.checked = attris.includes(cb.value));
-    if (params.get('am')) document.getElementById('det-attri-mode').value = params.get('am');
+    if (state.am) document.getElementById('det-attri-mode').value = state.am;
 
-    const color = params.get('color');
-    document.getElementById('color-single').checked = (color === 'single');
-    document.getElementById('color-multi').checked = (color === 'multi');
+    document.getElementById('color-single').checked = (state.color === 'single');
+    document.getElementById('color-multi').checked = (state.color === 'multi');
 
-    const charas = (params.get('chara') || '').split(',').filter(Boolean);
+    // ステータス・数値項目
+    const charas = state.chara || [];
     document.querySelectorAll('.chk-chara').forEach(cb => cb.checked = charas.includes(cb.value));
 
-    document.getElementById('det-total-cost').value = params.get('cost') || '';
-    if (params.get('costOp')) document.getElementById('det-cost-op').value = params.get('costOp');
+    document.getElementById('det-total-cost').value = state.cost || '';
+    if (state.costOp) document.getElementById('det-cost-op').value = state.costOp;
+    document.getElementById('det-divinity').value = state.div || '';
+    if (state.divOp) document.getElementById('det-divinity-op').value = state.divOp;
+    document.getElementById('det-atk').value = state.atk || '';
+    if (state.atkOp) document.getElementById('det-atk-op').value = state.atkOp;
+    document.getElementById('det-def').value = state.def || '';
+    if (state.defOp) document.getElementById('det-def-op').value = state.defOp;
 
-    document.getElementById('det-divinity').value = params.get('div') || '';
-    if (params.get('divOp')) document.getElementById('det-divinity-op').value = params.get('divOp');
-
-    document.getElementById('det-atk').value = params.get('atk') || '';
-    if (params.get('atkOp')) document.getElementById('det-atk-op').value = params.get('atkOp');
-
-    document.getElementById('det-def').value = params.get('def') || '';
-    if (params.get('defOp')) document.getElementById('det-def-op').value = params.get('defOp');
-
-    // 複数選択チェックボックス群の復元関数
-    const restoreCheckboxes = (paramKey, cls, prefix) => {
-      const vals = (params.get(paramKey) || '').split(',').filter(Boolean);
+    // チェックボックスグループの復元関数
+    const restoreCheckboxes = (vals, cls, prefix) => {
+      const list = vals || [];
       document.querySelectorAll(`.${cls}`).forEach(cb => {
-        cb.checked = vals.includes(cb.value);
+        cb.checked = list.includes(cb.value);
       });
       updateSelectedTags(prefix);
     };
 
-    restoreCheckboxes('types', 'chk-type', 'chk-type');
-    restoreCheckboxes('races', 'chk-race', 'chk-race');
-    restoreCheckboxes('exps', 'chk-exp', 'chk-exp');
-    restoreCheckboxes('rarities', 'chk-rarity', 'chk-rarity');
-    restoreCheckboxes('illus', 'chk-illustrator', 'chk-illustrator');
+    restoreCheckboxes(state.types, 'chk-type', 'chk-type');
+    restoreCheckboxes(state.races, 'chk-race', 'chk-race');
+    restoreCheckboxes(state.exps, 'chk-exp', 'chk-exp');
+    restoreCheckboxes(state.rarities, 'chk-rarity', 'chk-rarity');
+    restoreCheckboxes(state.illus, 'chk-illustrator', 'chk-illustrator');
 
-    document.getElementById('chk-paradox').checked = params.get('paradox') === '1';
+    document.getElementById('chk-paradox').checked = state.paradox === 1;
 
     searchDetailedCards(true);
-  } else if (tab === 'import' && sizeParam && sortParam && pageParam) {
-    document.getElementById('import-text-input').value = params.get('import') || '';
+
+  } else if (state.tab === 'import') {
+    document.getElementById('import-text-input').value = state.import || '';
     searchImportedCards(true);
   }
 
   // 再描画（ソート適用等）
-  if (filteredCards.length > 0 && sizeParam && sortParam && pageParam) {
-    applySortWithoutUrlUpdate(); // URL再書き換えを防ぐ内部ソート関数
-  }  
+  if (filteredCards.length > 0) {
+    applySortWithoutUrlUpdate();
+  }
 
-  // カード詳細モーダルの制御
+  // カード詳細モーダルの制御（そのまま維持）
   const cardNo = params.get('card');
   if (cardNo) {
     const targetCard = allCards.find(c => c.id === cardNo || c.uid === cardNo);
