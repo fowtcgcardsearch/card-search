@@ -2190,7 +2190,7 @@ function handleUrlState() {
   const sortParam = params.get('sort');
   const pageParam = params.get('p');
 
-  if(!sizeParam || !sortParam || !pageParam) return;
+  //if(!sizeParam || !sortParam || !pageParam) return;
 
   // 表示件数とソートとページの復元
   if (sizeParam && document.getElementById("page-size-select")) {
@@ -2203,11 +2203,11 @@ function handleUrlState() {
     currentPage = parseInt(pageParam, 10) || 1;
   }
 
-  if (tab === 'basic') {
+  if (tab === 'basic' && sizeParam && sortParam && pageParam) {
     const q = params.get('q') || '';
     document.getElementById("search-input").value = q;
     searchCards(true);
-  } else if (tab === 'detailed') {
+  } else if (tab === 'detailed' && sizeParam && sortParam && pageParam) {
     // 各項目の復元
     document.getElementById('det-text-input').value = params.get('dq') || '';
     if (params.get('sm')) document.getElementById('det-search-mode').value = params.get('sm');
@@ -2259,13 +2259,13 @@ function handleUrlState() {
     document.getElementById('chk-paradox').checked = params.get('paradox') === '1';
 
     searchDetailedCards(true);
-  } else if (tab === 'import') {
+  } else if (tab === 'import' && sizeParam && sortParam && pageParam) {
     document.getElementById('import-text-input').value = params.get('import') || '';
     searchImportedCards(true);
   }
 
   // 再描画（ソート適用等）
-  if (filteredCards.length > 0) {
+  if (filteredCards.length > 0 && sizeParam && sortParam && pageParam) {
     applySortWithoutUrlUpdate(); // URL再書き換えを防ぐ内部ソート関数
   }  
 
