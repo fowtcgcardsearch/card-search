@@ -161,7 +161,6 @@ function loadInitialData() {
           singleChk.checked = false;
         }
       });
-      restoreSearchConditionsFromCache();
     }
     if (cardData) loadCardData(cardData);
   })
@@ -193,6 +192,8 @@ function loadCardData(data) {
 
   // データ準備完了後、保存されたセッション状態を復元して検索を実行
   restoreSearchSession();
+  // URL直接アクセス時の状態判定を実行
+  handleUrlState();
 }
 
 /**
@@ -642,8 +643,6 @@ function resetDetailedSearch() {
  * 基本検索
  */
 function searchCards(isRestoring = false) {
-  // セッションに現在のタブ状態を保存
-  sessionStorage.setItem('activeSearchTab', 'basic');
   initNavigation(isRestoring);
 
   const input = document.getElementById("search-input").value;
@@ -663,15 +662,13 @@ function searchCards(isRestoring = false) {
       return keywords.every(kw => target.includes(kw));
     });
   }
-  displayCards();
+  displayCards(isRestoring);
 }
 
 /**
  * 詳細検索
  */
 function searchDetailedCards(isRestoring = false) {
-  // セッションに現在のタブ状態を保存
-  sessionStorage.setItem('activeSearchTab', 'detailed');
   initNavigation(isRestoring);
 
   // HTML要素が存在するかチェックし、無ければ空文字にする（エラー防止）
@@ -692,8 +689,8 @@ function searchDetailedCards(isRestoring = false) {
   // 属性
   const attris = Array.from(document.querySelectorAll('.chk-attri:checked')).map(el => el.value);
   const attriMode = document.getElementById('det-attri-mode')?.value || 'any';
-  const isSingleOnly = document.getElementById('color-single').checked || false;
-  const isMultiOnly = document.getElementById('color-multi').checked || false;
+  const isSingleOnly = document.getElementById('color-single')?.checked || false;
+  const isMultiOnly = document.getElementById('color-multi')?.checked || false;
   const characteristics = Array.from(document.querySelectorAll('.chk-chara:checked')).map(el => el.value);
   const cost = document.getElementById('det-total-cost')?.value || '';
   const costOp = document.getElementById('det-cost-op')?.value || 'eq';
@@ -808,15 +805,13 @@ function searchDetailedCards(isRestoring = false) {
   
   // 最後に検索フォームを閉じる
   document.getElementById('detailed-inputs').style.display = 'none';
-  displayCards();
+  displayCards(isRestoring);
 }
 
 /**
  * リストからインポートして検索
  */
 function searchImportedCards(isRestoring = false) {
-  // セッションに現在のタブ状態を保存
-  sessionStorage.setItem('activeSearchTab', 'import');
   initNavigation(isRestoring);
 
   const rawText = document.getElementById('import-text-input').value;
@@ -880,7 +875,7 @@ function searchImportedCards(isRestoring = false) {
   });
 
   filteredCards = [...primaryCards, ...extraCards];
-  displayCards();
+  displayCards(isRestoring);
 }
 
 /**
@@ -974,7 +969,7 @@ function checkStatus(val, op, target) {
 /** 
  * カード一覧表示
  */
-function displayCards() {
+function displayCards(skipHistory = false) {
   try {
     const container = document.getElementById("card-list");
     container.innerHTML = "";
@@ -1082,7 +1077,7 @@ function displayCards() {
     setupPagination(limit);
     toggleTextVisibility();
   } finally {
-    saveSearchConditionsToCache();
+    updateUrlParams(skipHistory);
   }
 }
 
@@ -1149,7 +1144,6 @@ function setupPagination(limit) {
         container.appendChild(createBtn(p, p, p === currentPage));
       }
     });
-    // ------------------------------------
 
     // 「次へ」ボタン
     container.appendChild(createBtn("次へ ›", currentPage + 1, false, currentPage === totalPages));
@@ -1360,12 +1354,20 @@ function unescapeHtml(str) {
 
 /**
  * カード詳細画面のモジュール表示
- */
-function openDetail(cardId) {
+ * @param {string} cardId 
+ * @param {boolean} isNavClick ナビゲーション移動時のフラグ
+ * @param {boolean} isFromUrl URL直接読み込み時のフラグ */
+function openDetail(cardId, isNavClick = false, isFromUrl = false) {
   // セッションにカードIDを保存
-  sessionStorage.setItem('activeDetailCardId', cardId);
   const targetCard = allCards.find(c => c.uid === cardId);
   if (!targetCard) return;
+
+  // --- URLへのカードNo反映 ---
+  if (!isFromUrl) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('card', targetCard.id); // カードNo（例: AO1-001）を付与
+    history.pushState(null, '', url.toString());
+  }
 
   // --- 前後のカードナビゲーション処理 ---
   const navContainer = document.getElementById("modal-nav");
@@ -1766,7 +1768,8 @@ function searchByProperty(propertyName, value) {
   }
 
   // 検索を実行
-  searchDetailedCards();
+  initNavigation(); // 履歴処理との兼ね合いでこのタイミングでナビゲーションバーを初期化する
+  searchDetailedCards(true);
   
   // モーダルを閉じる
   closeModal();
@@ -1791,8 +1794,9 @@ function getOfficialLink(cardNo) {
 
 /**
  * 詳細画面を閉じる
+ * @param {boolean} skipUrlUpdate URL操作をスキップするかどうか
  */
-function closeModal() {
+function closeModal(skipUrlUpdate = false) {
   document.getElementById("detail-modal").style.display = "none";
   // 元の画面のスクロールを許可する
   // 1. bodyの固定を解除
@@ -1802,8 +1806,15 @@ function closeModal() {
   document.body.style.width = '';
   // 2. 元のスクロール位置に戻す
   window.scrollTo(0, parseInt(scrollY || '0') * -1);
-  // セッションのカードID情報を削除
-  sessionStorage.removeItem('activeDetailCardId');
+
+  // URLから card パラメータを除去して履歴追加
+  if (!skipUrlUpdate) {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('card')) {
+      url.searchParams.delete('card');
+      history.pushState(null, '', url.toString());
+    }
+  }
 }
 
 /**
@@ -2027,7 +2038,7 @@ function openKeywordModal() {
   } else {
     // マスタの内容からHTMLを生成
     let html = '<ul style="list-style: none; padding-left: 0; margin: 0;">';
-    for(kw of keywords) {
+    for(let kw of keywords) {
       if(kw.category === "キーワード")continue;
       html += `
         <li style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #eee;">
@@ -2062,158 +2073,16 @@ window.addEventListener('click', function(event) {
 // ------------------------------------------------------------------------------------------------------------------
 
 /**
- * 検索条件をセッションストレージに保存する関数
- */
-function saveSearchConditionsToCache() {
-  // 1. 基本となる構造を準備
-  const searchState = {
-    basicKeyword: document.getElementById('search-input')?.value || "",
-    importList: document.getElementById('import-text-input')?.value || "",
-
-    // 動的に入れる詳細検索フォーム用オブジェクト
-    detailedForm: {},
-
-    // チェックボックス群（動的に生成される項目など）
-    chkType: Array.from(document.querySelectorAll('.chk-type:checked')).map(el => el.value),
-    chkRace: Array.from(document.querySelectorAll('.chk-race:checked')).map(el => el.value),
-    chkExp: Array.from(document.querySelectorAll('.chk-exp:checked')).map(el => el.value),
-    chkRarity: Array.from(document.querySelectorAll('.chk-rarity:checked')).map(el => el.value),
-    chkIllustrator: Array.from(document.querySelectorAll('.chk-illustrator:checked')).map(el => el.value),
-
-    // ナビゲーション・表示・コントロール系
-    pageSize: document.getElementById('page-size-select')?.value || "30",
-    sortSelect: document.getElementById('sort-select')?.value || "date-desc",
-    currentPage: currentPage || 1
-  };
-
-  // 2. INITIAL_FORM_VALUES のキー（id）をループ処理して詳細検索の値をセット
-  Object.keys(INITIAL_FORM_VALUES).forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) {
-      searchState.detailedForm[id] = INITIAL_FORM_VALUES[id];
-      return;
-    }
-
-    if (el.type === 'checkbox') {
-      searchState.detailedForm[id] = el.checked;
-    } else {
-      searchState.detailedForm[id] = el.value;
-    }
-  });
-
-  // JSON文字列に変換して保存
-  sessionStorage.setItem('fow_search_cache', JSON.stringify(searchState));
-  //console.log("検索条件をセッションに保存しました。");
-}
-
-/** 
- * キャッシュから検索条件を読み込んで画面に復元する関数
- */
-function restoreSearchConditionsFromCache() {
-  const cacheData = sessionStorage.getItem('fow_search_cache');
-  if (!cacheData) return; // キャッシュが無ければ何もしない
-
-  try {
-    const searchState = JSON.parse(cacheData);
-
-    // 1. テキスト入力・基本検索の復元
-    if (document.getElementById('search-input') && searchState.basicKeyword !== undefined) {
-      document.getElementById('search-input').value = searchState.basicKeyword;
-    }
-    if (document.getElementById('import-text-input') && searchState.importList !== undefined) {
-      document.getElementById('import-text-input').value = searchState.importList;
-    }
-
-    // 2. 詳細検索フォーム（INITIAL_FORM_VALUES構造）の復元
-    if (searchState.detailedForm) {
-      Object.keys(INITIAL_FORM_VALUES).forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-
-        // 保存された値があればそれを使う。なければ初期値を使う
-        const savedVal = (searchState.detailedForm[id] !== undefined) 
-          ? searchState.detailedForm[id] 
-          : INITIAL_FORM_VALUES[id];
-
-        if (el.type === 'checkbox') {
-          el.checked = savedVal;
-        } else {
-          el.value = savedVal;
-        }
-      });
-    }
-
-    // 3. 共通チェックボックス群（クラス指定のもの）の復元
-    const restoreClassCheckboxes = (className, savedValues) => {
-      if (!savedValues || !Array.isArray(savedValues)) return;
-      document.querySelectorAll(`.${className}`).forEach(cb => {
-        cb.checked = savedValues.includes(cb.value);
-      });
-    };
-
-    restoreClassCheckboxes('chk-type', searchState.chkType);
-    restoreClassCheckboxes('chk-race', searchState.chkRace);
-    restoreClassCheckboxes('chk-exp', searchState.chkExp);
-    restoreClassCheckboxes('chk-rarity', searchState.chkRarity);
-    restoreClassCheckboxes('chk-illustrator', searchState.chkIllustrator);
-
-    // バッジ（タグ）表示の更新
-    ['chk-type', 'chk-race', 'chk-exp', 'chk-rarity', 'chk-illustrator'].forEach(prefix => {
-      if (typeof updateSelectedTags === 'function') updateSelectedTags(prefix);
-    });
-
-    // 4. ナビゲーション・表示状態・ページの復元
-    if (document.getElementById('page-size-select') && searchState.pageSize) {
-      document.getElementById('page-size-select').value = searchState.pageSize;
-    }
-    if (document.getElementById('sort-select') && searchState.sortSelect) {
-      document.getElementById('sort-select').value = searchState.sortSelect;
-    }
-    if (document.getElementById('toggle-card-en-text') && sessionStorage.getItem('toggleCardEnText') !== undefined) {
-      document.getElementById('toggle-card-en-text').checked = sessionStorage.getItem('toggleCardEnText') === "true";
-    }
-    if (document.getElementById('toggle-card-jp-text') && sessionStorage.getItem('toggleCardJpText') !== undefined) {
-      document.getElementById('toggle-card-jp-text').checked = sessionStorage.getItem('toggleCardJpText') === "true";
-    }
-
-    if (searchState.currentPage) {
-      currentPage = searchState.currentPage;
-    }
-
-    //console.log("セッションから検索条件を復元しました。");
-
-  } catch (e) {
-    console.error("キャッシュの復元中にエラーが発生しました:", e);
-    sessionStorage.removeItem('fow_search_cache');
-  }
-}
-
-/**
  * セッション情報を読み込んで状態と検索を復元する関数
  */
 function restoreSearchSession() {
-  // セッションから保存されたタブを取得（未保存の場合はデフォルト ''）
-  const savedTab = sessionStorage.getItem('activeSearchTab') || '';
-
-  // UIのタブ表示を復元
-  switchTab(savedTab === '' ? 'basic' : savedTab);
-
-  // 復元されたタブに応じて対応する既存の検索関数を実行
-  // ※この中で displayCards() が呼ばれ、DOMが生成されます
-  switch (savedTab) {
-    case 'basic':
-      if (typeof searchCards === 'function') searchCards(true);
-      break;
-    case 'detailed':
-      if (typeof searchDetailedCards === 'function') searchDetailedCards(true);
-      break;
-    case 'import':
-      if (typeof searchImportedCards === 'function') searchImportedCards(true);
-      break;
-    default:
-      break;
+  // セッションから英語/日本語テキストの表示状態を復元
+  if (document.getElementById('toggle-card-en-text') && sessionStorage.getItem('toggleCardEnText') !== undefined) {
+    document.getElementById('toggle-card-en-text').checked = sessionStorage.getItem('toggleCardEnText') === "true";
   }
-
+  if (document.getElementById('toggle-card-jp-text') && sessionStorage.getItem('toggleCardJpText') !== undefined) {
+    document.getElementById('toggle-card-jp-text').checked = sessionStorage.getItem('toggleCardJpText') === "true";
+  }
   // ブラウザの描画準備が完了したフレームでスクロールとモーダル展開を一括実行
   requestAnimationFrame(() => {
     // スクロール位置の復元
@@ -2221,12 +2090,227 @@ function restoreSearchSession() {
     if (savedScrollY) {
       window.scrollTo(0, parseInt(savedScrollY, 10));
     }
-
-    // スクロール完了直後に詳細モーダルを開く
-    const activeCardId = sessionStorage.getItem('activeDetailCardId');
-    if (activeCardId) {
-      openDetail(activeCardId);
-    }
   });
 }
 
+// ------------------------------------------------------------------------------------------------------------------
+// URL & History API 管理用関数
+// ------------------------------------------------------------------------------------------------------------------
+
+/**
+ * 現在の検索条件・タブ・ソート・ページ数をURLに反映
+ */
+function updateUrlParams(skipHistory = false) {
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+
+  // アクティブなタブ
+  const activeTab = document.querySelector('.tab.active')?.id.replace('tab-', '') || 'basic';
+  params.set('tab', activeTab);
+
+  // 共通設定
+  const pageSize = document.getElementById("page-size-select")?.value;
+  if (pageSize) url.searchParams.set('size', pageSize);
+  const sortVal = document.getElementById("sort-select")?.value;
+  if (sortVal) params.set('sort', sortVal);
+  params.set('p', currentPage);
+
+  if (activeTab === 'basic') {
+    const q = document.getElementById("search-input")?.value || '';
+    if (q) params.set('q', q); else params.delete('q');
+  } else if (activeTab === 'detailed') {
+    // 詳細検索のパラメータ設定
+    const setParam = (key, value) => { if (value) params.set(key, value); else params.delete(key); };
+
+    setParam('dq', document.getElementById('det-text-input')?.value);
+    setParam('sm', document.getElementById('det-search-mode')?.value);
+
+    // チェックボックス群
+    const chkName = document.getElementById('chk-name')?.checked;
+    const chkText = document.getElementById('chk-text')?.checked;
+    const chkNo = document.getElementById('chk-no')?.checked;
+    const chkFlavor = document.getElementById('chk-flavor')?.checked;
+    setParam('targets', [chkName ? 'name' : '', chkText ? 'text' : '', chkNo ? 'no' : '', chkFlavor ? 'flavor' : ''].filter(Boolean).join(','));
+
+    const attris = Array.from(document.querySelectorAll('.chk-attri:checked')).map(el => el.value);
+    setParam('attri', attris.join(','));
+    setParam('am', document.getElementById('det-attri-mode')?.value);
+
+    if (document.getElementById('color-single')?.checked) params.set('color', 'single');
+    else if (document.getElementById('color-multi')?.checked) params.set('color', 'multi');
+    else params.delete('color');
+
+    const charas = Array.from(document.querySelectorAll('.chk-chara:checked')).map(el => el.value);
+    setParam('chara', charas.join(','));
+
+    // ステータス検索
+    setParam('cost', document.getElementById('det-total-cost')?.value);
+    setParam('costOp', document.getElementById('det-cost-op')?.value);
+    setParam('div', document.getElementById('det-divinity')?.value);
+    setParam('divOp', document.getElementById('det-divinity-op')?.value);
+    setParam('atk', document.getElementById('det-atk')?.value);
+    setParam('atkOp', document.getElementById('det-atk-op')?.value);
+    setParam('def', document.getElementById('det-def')?.value);
+    setParam('defOp', document.getElementById('det-def-op')?.value);
+
+    // 複数選択リスト
+    const getChecked = (cls) => Array.from(document.querySelectorAll(`.${cls}:checked`)).map(el => el.value).join(',');
+    setParam('types', getChecked('chk-type'));
+    setParam('races', getChecked('chk-race'));
+    setParam('exps', getChecked('chk-exp'));
+    setParam('rarities', getChecked('chk-rarity'));
+    setParam('illus', getChecked('chk-illustrator'));
+
+    if (document.getElementById('chk-paradox')?.checked) params.set('paradox', '1');
+    else params.delete('paradox');
+  } else if (activeTab === 'import') {
+    const importText = document.getElementById('import-text-input')?.value || '';
+    if (importText) params.set('import', importText); else params.delete('import');
+  }
+
+  // 履歴更新の判定
+  if (!skipHistory) {
+    history.pushState(null, '', url.toString());
+  } else {
+    history.replaceState(null, '', url.toString());
+  }
+}
+
+/**
+ * URLパラメータを解析して検索フォーム状態を読み込み・検索を実行
+ */
+function handleUrlState() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('tab') || 'basic';
+  
+  // タブ切り替え（表示制御のみ）
+  switchTab(tab);
+
+  const sizeParam = params.get('size');
+  const sortParam = params.get('sort');
+  const pageParam = params.get('p');
+
+  if(!sizeParam || !sortParam || !pageParam) return;
+
+  // 表示件数とソートとページの復元
+  if (sizeParam && document.getElementById("page-size-select")) {
+    document.getElementById("page-size-select").value = sizeParam;
+  }
+  if (sortParam && document.getElementById("sort-select")) {
+    document.getElementById("sort-select").value = sortParam;
+  }
+  if (pageParam) {
+    currentPage = parseInt(pageParam, 10) || 1;
+  }
+
+  if (tab === 'basic') {
+    const q = params.get('q') || '';
+    document.getElementById("search-input").value = q;
+    searchCards(true);
+  } else if (tab === 'detailed') {
+    // 各項目の復元
+    document.getElementById('det-text-input').value = params.get('dq') || '';
+    if (params.get('sm')) document.getElementById('det-search-mode').value = params.get('sm');
+
+    const targets = (params.get('targets') || 'name,text').split(',');
+    document.getElementById('chk-name').checked = targets.includes('name');
+    document.getElementById('chk-text').checked = targets.includes('text');
+    document.getElementById('chk-no').checked = targets.includes('no');
+    document.getElementById('chk-flavor').checked = targets.includes('flavor');
+
+    const attris = (params.get('attri') || '').split(',').filter(Boolean);
+    document.querySelectorAll('.chk-attri').forEach(cb => cb.checked = attris.includes(cb.value));
+    if (params.get('am')) document.getElementById('det-attri-mode').value = params.get('am');
+
+    const color = params.get('color');
+    document.getElementById('color-single').checked = (color === 'single');
+    document.getElementById('color-multi').checked = (color === 'multi');
+
+    const charas = (params.get('chara') || '').split(',').filter(Boolean);
+    document.querySelectorAll('.chk-chara').forEach(cb => cb.checked = charas.includes(cb.value));
+
+    document.getElementById('det-total-cost').value = params.get('cost') || '';
+    if (params.get('costOp')) document.getElementById('det-cost-op').value = params.get('costOp');
+
+    document.getElementById('det-divinity').value = params.get('div') || '';
+    if (params.get('divOp')) document.getElementById('det-divinity-op').value = params.get('divOp');
+
+    document.getElementById('det-atk').value = params.get('atk') || '';
+    if (params.get('atkOp')) document.getElementById('det-atk-op').value = params.get('atkOp');
+
+    document.getElementById('det-def').value = params.get('def') || '';
+    if (params.get('defOp')) document.getElementById('det-def-op').value = params.get('defOp');
+
+    // 複数選択チェックボックス群の復元関数
+    const restoreCheckboxes = (paramKey, cls, prefix) => {
+      const vals = (params.get(paramKey) || '').split(',').filter(Boolean);
+      document.querySelectorAll(`.${cls}`).forEach(cb => {
+        cb.checked = vals.includes(cb.value);
+      });
+      updateSelectedTags(prefix);
+    };
+
+    restoreCheckboxes('types', 'chk-type', 'chk-type');
+    restoreCheckboxes('races', 'chk-race', 'chk-race');
+    restoreCheckboxes('exps', 'chk-exp', 'chk-exp');
+    restoreCheckboxes('rarities', 'chk-rarity', 'chk-rarity');
+    restoreCheckboxes('illus', 'chk-illustrator', 'chk-illustrator');
+
+    document.getElementById('chk-paradox').checked = params.get('paradox') === '1';
+
+    searchDetailedCards(true);
+  } else if (tab === 'import') {
+    document.getElementById('import-text-input').value = params.get('import') || '';
+    searchImportedCards(true);
+  }
+
+  // 再描画（ソート適用等）
+  if (filteredCards.length > 0) {
+    applySortWithoutUrlUpdate(); // URL再書き換えを防ぐ内部ソート関数
+  }  
+
+  // カード詳細モーダルの制御
+  const cardNo = params.get('card');
+  if (cardNo) {
+    const targetCard = allCards.find(c => c.id === cardNo || c.uid === cardNo);
+    if (targetCard) {
+      openDetail(targetCard.uid, false, true);
+    }
+  } else {
+    const detailModal = document.getElementById("detail-modal");
+    if (detailModal && detailModal.style.display === "flex") {
+      closeModal(true);
+    }
+  }
+}
+
+/**
+ * URL書き換えを発生させずにソートのみ適用する内部関数
+ */
+function applySortWithoutUrlUpdate() {
+  const sortValue = document.getElementById("sort-select").value;
+  const currentIds = new Set(filteredCards.map(c => c.uid));
+  filteredCards = allCards.filter(c => currentIds.has(c.uid));
+
+  filteredCards.sort((a, b) => {
+    switch (sortValue) {
+      case 'date-desc': return new Date(b.releaseDate) - new Date(a.releaseDate);
+      case 'date-asc':  return new Date(a.releaseDate) - new Date(b.releaseDate);
+      case 'name-asc':  return (a.enName || "").localeCompare(b.enName || "");
+      case 'name-desc': return (b.enName || "").localeCompare(a.enName || "");
+      case 'cost-asc':  return compareNumeric(a.totalCost, b.totalCost);
+      case 'cost-desc': return compareNumeric(b.totalCost, a.totalCost);
+      case 'atk-asc':   return compareNumeric(a.atk, b.atk);
+      case 'atk-desc':  return compareNumeric(b.atk, a.atk);
+      case 'def-asc':   return compareNumeric(a.def, b.def);
+      case 'def-desc':  return compareNumeric(b.def, a.def);
+      default: return 0;
+    }
+  });
+  displayCards(true); // スキップフラグを渡す
+}
+
+// ブラウザの「戻る」「進む」ボタン押下時のイベントリスナー
+window.addEventListener('popstate', () => {
+  handleUrlState();
+});
