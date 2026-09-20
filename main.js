@@ -2187,6 +2187,8 @@ function handleUrlState() {
   if (!compressedData) {
     // パラメータがない場合は初期設定（必要に応じて記述）
     switchTab('basic');
+    // カード詳細モーダルの制御
+    openDetailByUrl(params);
     return;
   }
 
@@ -2280,7 +2282,16 @@ function handleUrlState() {
     applySortWithoutUrlUpdate();
   }
 
-  // カード詳細モーダルの制御（そのまま維持）
+  // カード詳細モーダルの制御
+  openDetailByUrl(params);
+}
+
+
+/**
+ * URLのパラメータからカード詳細を開く内部関数
+ */
+function openDetailByUrl(params) {
+  // カード詳細モーダルの制御
   const cardNo = params.get('card');
   if (cardNo) {
     const targetCard = allCards.find(c => c.id === cardNo || c.uid === cardNo);
