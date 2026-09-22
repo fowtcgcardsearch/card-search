@@ -53,6 +53,14 @@ let keywordTooltipTimer = null;  // キーワードにマウスオーバーし�
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById("loading-overlay").style.display = "flex";
   
+  // ヘッダータイトルのクリックイベント
+  const headerLogo = document.getElementById('header-logo');
+  if (headerLogo) {
+    headerLogo.addEventListener('click', () => {
+      resetToHomeScreen();
+    });
+  }
+
   // スクロールするたびに位置を記憶（負荷軽減のためrequestAnimationFrame等の利用も可）
   window.addEventListener('scroll', () => {
     // モーダル表示中（bodyがfixedのとき）は保存しない
@@ -450,6 +458,53 @@ function fadeAndRemove(element) {
       element.parentNode.removeChild(element);
     }
   }, 300);
+}
+
+/**
+ * ホーム画面（完全に初期化された状態）に戻す処理
+ */
+function resetToHomeScreen() {
+  // 1. かんたん検索フォームの初期化
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) searchInput.value = '';
+
+  // 2. 詳細検索フォームの初期化（作成済みの関数を実行）
+  if (typeof resetDetailedSearch === 'function') {
+    resetDetailedSearch();
+  }
+  const importInput = document.getElementById('import-text-input'); // 実際のIDに合わせ変更してください
+  if (importInput) importInput.value = '';
+
+  // 3. 検索結果のクリア
+  const controlBar = document.getElementById('controls-bar');
+  if (controlBar) {
+    controlBar.style.display = 'none';
+  }
+  const resultContainer = document.getElementById('card-list');
+  if (resultContainer) {
+    resultContainer.innerHTML = '<p class="info-msg">検索ワードを入力して「検索」ボタンを押してください。</p>';
+  }
+  const footerControlBar = document.getElementById('footer-controls-bar');
+  if (footerControlBar) {
+    footerControlBar.style.display = '';
+  }
+
+  // フォームの開閉を初期状態に
+  const detailedForm = document.getElementById('detailed-inputs');
+  if (detailedForm) {
+    detailedForm.style.display = 'flex';
+  }
+  const importForm = document.getElementById('import-inputs');
+  if (importForm) {
+    importForm.style.display = 'flex';
+  }
+
+  // 4. デフォルトのタブへ切替
+  switchTab('basic');
+
+  // 5. URLパラメータをクリアして初期状態のURLへ更新
+  const cleanUrl = window.location.pathname;
+  window.history.pushState(null, '', cleanUrl);
 }
 
 // ------------------------------------------------------------------------------------------------------------------
@@ -1386,11 +1441,11 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
     const nextCard = targetList[currentIndex + 1];
 
     const prevBtnHtml = prevCard 
-      ? `<button class="modal-nav-btn" onclick="openDetail('${prevCard.uid}')">← 前のカード</button>`
-      : `<button class="modal-nav-btn" disabled>← 前のカード</button>`;
+      ? `<button class="modal-nav-btn" onclick="openDetail('${prevCard.uid}')">← ${prevCard.id}</button>`
+      : `<button class="modal-nav-btn" disabled>← </button>`;
 
     const nextBtnHtml = nextCard 
-      ? `<button class="modal-nav-btn" onclick="openDetail('${nextCard.uid}')">次のカード →</button>`
+      ? `<button class="modal-nav-btn" onclick="openDetail('${nextCard.uid}')">${nextCard.id} →</button>`
       : `<button class="modal-nav-btn" disabled>次のカード →</button>`;
 
     const counterHtml = `<span class="modal-nav-counter">${currentIndex + 1} / ${targetList.length}</span>`;
@@ -1577,7 +1632,15 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
 
     modalContent += `
       <div class="modal-title">
-        <h2 style="margin: 0; font-size: 20px; color: #1e293b;">${card.enName || '（No English Name）'}</h2>
+        <h2 style="margin: 0; font-size: 20px; color: #1e293b;">${card.enName || '（No English Name）'}
+          <button type="button" class="copy-url-btn" onclick="copyCardUrl('${card.id}')" title="カードの個別URLをコピー">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+            <span class="copy-tooltip">URLをコピー</span>
+          </button>
+        </h2>
         <p style="margin: 4px 0 0 0; color: #64748b; font-size: 14px; font-weight: bold;">${card.jpName || ''}</p>
       </div>
 
@@ -1641,6 +1704,64 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
   document.getElementById("detail-modal").style.display = "flex";
   // スクロールをトップに戻す
   document.querySelector(".modal-content").scrollTop = 0; 
+}
+
+/**
+ * カード単体用URLをクリップボードにコピーする関数
+ * @param {string} cardId - カードID (例: 'QSK-002')
+ */
+function copyCardUrl(cardId) {
+  const baseUrl = window.location.origin + window.location.pathname;
+  const shareUrl = `${baseUrl}?card=${cardId}`;
+
+  // 1. モダンブラウザ（標準API）を試行
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => {
+        showToast('カードの個別URLをコピーしました！');
+      })
+      .catch(() => {
+        // 失敗した場合は古い手法（execCommand）にフォールバック
+        fallbackCopyTextToClipboard(shareUrl);
+      });
+  } else {
+    // APIが非対応の環境用フォールバック
+    fallbackCopyTextToClipboard(shareUrl);
+  }
+}
+
+/**
+ * スマホ古めのブラウザ用フォールバック処理
+ */
+function fallbackCopyTextToClipboard(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  
+  // 画面外に配置しつつ選択可能にする
+  textArea.style.position = 'fixed';
+  textArea.style.top = '0';
+  textArea.style.left = '0';
+  textArea.style.opacity = '0';
+  
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  // iOS Safari 対策 (全選択の確実化)
+  textArea.setSelectionRange(0, 99999);
+
+  try {
+    const successful = document.execCommand('copy');
+    if (successful) {
+      showToast('カードの個別URLをコピーしました！');
+    } else {
+      alert('コピーに失敗しました。手動でコピーしてください:\n' + text);
+    }
+  } catch (err) {
+    alert('コピーに失敗しました。手動でコピーしてください:\n' + text);
+  }
+
+  document.body.removeChild(textArea);
 }
 
 /**
@@ -2114,42 +2235,99 @@ function updateUrlParams(skipHistory = false) {
   if (state.tab === 'basic') {
     state.q = document.getElementById("search-input")?.value || '';
   } else if (state.tab === 'detailed') {
-    state.dq = document.getElementById('det-text-input')?.value || '';
-    state.sm = document.getElementById('det-search-mode')?.value;
+    // 1. テキスト入力
+    const dq = document.getElementById('det-text-input')?.value || '';
+    if (dq !== INITIAL_FORM_VALUES['det-text-input']) state.dq = dq;
+
+    // 2. 検索モード（初期値以外なら保存）
+    const sm = document.getElementById('det-search-mode')?.value;
+    if (sm && sm !== INITIAL_FORM_VALUES['det-search-mode']) state.sm = sm;
     
-    // ターゲット設定
-    state.targets = [
+    // 3. 検索対象ターゲット（初期値と差分がある場合のみ保存）
+    const targets = [];
+    if (document.getElementById('chk-name')?.checked !== INITIAL_FORM_VALUES['chk-name']) {
+      if (document.getElementById('chk-name')?.checked) targets.push('name');
+    }
+    // ...必要に応じてチェック判定
+    // あるいは、初期値(name: true, text: true)と異なる設定になっている場合のみ配列で保存:
+    const currentTargets = [
       document.getElementById('chk-name')?.checked ? 'name' : '',
       document.getElementById('chk-text')?.checked ? 'text' : '',
       document.getElementById('chk-no')?.checked ? 'no' : '',
       document.getElementById('chk-flavor')?.checked ? 'flavor' : ''
     ].filter(Boolean);
+    
+    // デフォルトの組み合わせ（['name', 'text']）と違う場合のみ持たせる
+    if (JSON.stringify(currentTargets) !== JSON.stringify(['name', 'text'])) {
+      state.targets = currentTargets;
+    }
 
-    // 属性・色
-    state.attri = Array.from(document.querySelectorAll('.chk-attri:checked')).map(el => el.value);
-    state.am = document.getElementById('det-attri-mode')?.value;
-    if (document.getElementById('color-single')?.checked) state.color = 'single';
-    if (document.getElementById('color-multi')?.checked) state.color = 'multi';
+    // 4. 属性・色
+    const attri = Array.from(document.querySelectorAll('.chk-attri:checked')).map(el => el.value);
+    if (attri.length > 0) state.attri = attri;
 
-    // コスト・ステータス
-    state.chara = Array.from(document.querySelectorAll('.chk-chara:checked')).map(el => el.value);
-    state.cost = document.getElementById('det-total-cost')?.value || '';
-    state.costOp = document.getElementById('det-cost-op')?.value;
-    state.div = document.getElementById('det-divinity')?.value || '';
-    state.divOp = document.getElementById('det-divinity-op')?.value;
-    state.atk = document.getElementById('det-atk')?.value || '';
-    state.atkOp = document.getElementById('det-atk-op')?.value;
-    state.def = document.getElementById('det-def')?.value || '';
-    state.defOp = document.getElementById('det-def-op')?.value;
+    const am = document.getElementById('det-attri-mode')?.value;
+    if (am && am !== INITIAL_FORM_VALUES['det-attri-mode']) state.am = am;
 
-    // 複数選択チェックボックス群
+    if (document.getElementById('color-single')?.checked !== INITIAL_FORM_VALUES['color-single']) {
+      if (document.getElementById('color-single')?.checked) state.color = 'single';
+    }
+    if (document.getElementById('color-multi')?.checked !== INITIAL_FORM_VALUES['color-multi']) {
+      if (document.getElementById('color-multi')?.checked) state.color = 'multi';
+    }
+
+    // 5. コスト・数値項目（空文字や初期値と異なる場合のみ）
+    const chara = Array.from(document.querySelectorAll('.chk-chara:checked')).map(el => el.value);
+    if (chara.length > 0) state.chara = chara;
+
+    const cost = document.getElementById('det-total-cost')?.value || '';
+    if (cost !== INITIAL_FORM_VALUES['det-total-cost']) {
+      state.cost = cost;
+      const costOp = document.getElementById('det-cost-op')?.value;
+      if (costOp !== INITIAL_FORM_VALUES['det-cost-op']) state.costOp = costOp;
+    }
+
+    const div = document.getElementById('det-divinity')?.value || '';
+    if (div !== INITIAL_FORM_VALUES['det-divinity']) {
+      state.div = div;
+      const divOp = document.getElementById('det-divinity-op')?.value;
+      if (divOp !== INITIAL_FORM_VALUES['det-divinity-op']) state.divOp = divOp;
+    }
+
+    const atk = document.getElementById('det-atk')?.value || '';
+    if (atk !== INITIAL_FORM_VALUES['det-atk']) {
+      state.atk = atk;
+      const atkOp = document.getElementById('det-atk-op')?.value;
+      if (atkOp !== INITIAL_FORM_VALUES['det-atk-op']) state.atkOp = atkOp;
+    }
+
+    const def = document.getElementById('det-def')?.value || '';
+    if (def !== INITIAL_FORM_VALUES['det-def']) {
+      state.def = def;
+      const defOp = document.getElementById('det-def-op')?.value;
+      if (defOp !== INITIAL_FORM_VALUES['det-def-op']) state.defOp = defOp;
+    }
+
+    // 6. 複数選択チェックボックス群（要素がある時だけ持たせる）
     const getChecked = (cls) => Array.from(document.querySelectorAll(`.${cls}:checked`)).map(el => el.value);
-    state.types = getChecked('chk-type');
-    state.races = getChecked('chk-race');
-    state.exps = getChecked('chk-exp');
-    state.rarities = getChecked('chk-rarity');
-    state.illus = getChecked('chk-illustrator');
-    state.paradox = document.getElementById('chk-paradox')?.checked ? 1 : 0;
+    const types = getChecked('chk-type');
+    if (types.length > 0) state.types = types;
+
+    const races = getChecked('chk-race');
+    if (races.length > 0) state.races = races;
+
+    const exps = getChecked('chk-exp');
+    if (exps.length > 0) state.exps = exps;
+
+    const rarities = getChecked('chk-rarity');
+    if (rarities.length > 0) state.rarities = rarities;
+
+    const illus = getChecked('chk-illustrator');
+    if (illus.length > 0) state.illus = illus;
+
+    if (document.getElementById('chk-paradox')?.checked !== INITIAL_FORM_VALUES['chk-paradox']) {
+      if (document.getElementById('chk-paradox')?.checked) state.paradox = 1;
+    }
 
   } else if (state.tab === 'import') {
     state.import = document.getElementById('import-text-input')?.value || '';
@@ -2222,42 +2400,54 @@ function handleUrlState() {
     searchCards(true);
 
   } else if (state.tab === 'detailed') {
-    document.getElementById('det-text-input').value = state.dq || '';
-    if (state.sm) document.getElementById('det-search-mode').value = state.sm;
+    // まずフォーム全体を初期値にリセット
+    resetDetailedSearch();
 
-    // ターゲット復元
-    const targets = state.targets || [];
-    document.getElementById('chk-name').checked = targets.includes('name');
-    document.getElementById('chk-text').checked = targets.includes('text');
-    document.getElementById('chk-no').checked = targets.includes('no');
-    document.getElementById('chk-flavor').checked = targets.includes('flavor');
+    // URLに値が存在するものだけ上書き復元
+    if (state.dq !== undefined) document.getElementById('det-text-input').value = state.dq;
+    if (state.sm !== undefined) document.getElementById('det-search-mode').value = state.sm;
+
+    // ターゲット復元（state.targets がある場合のみ上書き、無ければ初期値のまま）
+    if (state.targets !== undefined) {
+      document.getElementById('chk-name').checked = state.targets.includes('name');
+      document.getElementById('chk-text').checked = state.targets.includes('text');
+      document.getElementById('chk-no').checked = state.targets.includes('no');
+      document.getElementById('chk-flavor').checked = state.targets.includes('flavor');
+    }
 
     // 属性・色
-    const attris = state.attri || [];
-    document.querySelectorAll('.chk-attri').forEach(cb => cb.checked = attris.includes(cb.value));
-    if (state.am) document.getElementById('det-attri-mode').value = state.am;
+    if (state.attri !== undefined) {
+      document.querySelectorAll('.chk-attri').forEach(cb => cb.checked = state.attri.includes(cb.value));
+    }
+    if (state.am !== undefined) document.getElementById('det-attri-mode').value = state.am;
 
-    document.getElementById('color-single').checked = (state.color === 'single');
-    document.getElementById('color-multi').checked = (state.color === 'multi');
+    if (state.color !== undefined) {
+      document.getElementById('color-single').checked = (state.color === 'single');
+      document.getElementById('color-multi').checked = (state.color === 'multi');
+    }
 
     // ステータス・数値項目
-    const charas = state.chara || [];
-    document.querySelectorAll('.chk-chara').forEach(cb => cb.checked = charas.includes(cb.value));
+    if (state.chara !== undefined) {
+      document.querySelectorAll('.chk-chara').forEach(cb => cb.checked = state.chara.includes(cb.value));
+    }
 
-    document.getElementById('det-total-cost').value = state.cost || '';
-    if (state.costOp) document.getElementById('det-cost-op').value = state.costOp;
-    document.getElementById('det-divinity').value = state.div || '';
-    if (state.divOp) document.getElementById('det-divinity-op').value = state.divOp;
-    document.getElementById('det-atk').value = state.atk || '';
-    if (state.atkOp) document.getElementById('det-atk-op').value = state.atkOp;
-    document.getElementById('det-def').value = state.def || '';
-    if (state.defOp) document.getElementById('det-def-op').value = state.defOp;
+    if (state.cost !== undefined) document.getElementById('det-total-cost').value = state.cost;
+    if (state.costOp !== undefined) document.getElementById('det-cost-op').value = state.costOp;
+
+    if (state.div !== undefined) document.getElementById('det-divinity').value = state.div;
+    if (state.divOp !== undefined) document.getElementById('det-divinity-op').value = state.divOp;
+
+    if (state.atk !== undefined) document.getElementById('det-atk').value = state.atk;
+    if (state.atkOp !== undefined) document.getElementById('det-atk-op').value = state.atkOp;
+
+    if (state.def !== undefined) document.getElementById('det-def').value = state.def;
+    if (state.defOp !== undefined) document.getElementById('det-def-op').value = state.defOp;
 
     // チェックボックスグループの復元関数
     const restoreCheckboxes = (vals, cls, prefix) => {
-      const list = vals || [];
+      if (vals === undefined) return;
       document.querySelectorAll(`.${cls}`).forEach(cb => {
-        cb.checked = list.includes(cb.value);
+        cb.checked = vals.includes(cb.value);
       });
       updateSelectedTags(prefix);
     };
@@ -2268,7 +2458,9 @@ function handleUrlState() {
     restoreCheckboxes(state.rarities, 'chk-rarity', 'chk-rarity');
     restoreCheckboxes(state.illus, 'chk-illustrator', 'chk-illustrator');
 
-    document.getElementById('chk-paradox').checked = state.paradox === 1;
+    if (state.paradox !== undefined) {
+      document.getElementById('chk-paradox').checked = (state.paradox === 1);
+    }
 
     searchDetailedCards(true);
 
