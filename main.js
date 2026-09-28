@@ -1711,8 +1711,8 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
  * @param {string} cardId - カードID (例: 'QSK-002')
  */
 function copyCardUrl(cardId) {
-  const baseUrl = window.location.origin + window.location.pathname;
-  const shareUrl = `${baseUrl}?card=${cardId}`;
+  const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
+  const shareUrl = `${baseUrl}/card/${cardId}.html`;
 
   // 1. モダンブラウザ（標準API）を試行
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2361,8 +2361,14 @@ function updateUrlParams(skipHistory = false) {
 function handleUrlState() {
   const params = new URLSearchParams(window.location.search);
   const compressedData = params.get('d');
-
   if (!compressedData) {
+    const property = params.get('property');
+    const value = params.get('value');
+    if (property && value && ['exp', 'race', 'illustrator', 'type'].includes(property)) {
+      searchByProperty(property, value);
+      return;
+    }
+
     // パラメータがない場合は初期設定（必要に応じて記述）
     switchTab('basic');
     // カード詳細モーダルの制御
