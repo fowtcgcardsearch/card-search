@@ -34,8 +34,17 @@
 
 <header class="site-header">
   <div class="header-inner">
+    <div class="header-menu-wrap">
+      <button id="header-menu-button" class="header-menu-button" type="button" aria-label="メニュー" aria-expanded="false" onclick="toggleToolMenu()">
+        <span></span><span></span><span></span>
+      </button>
+      <nav id="header-tool-menu" class="header-tool-menu" hidden>
+        <button type="button" onclick="openLifeTool()">ライフ計算ツール</button>
+      </nav>
+    </div>
     <!-- タイトルテキスト部分をロゴ/ホームリンクとして扱う -->
     <h1 id="header-logo" class="header-title">Force of Will カード検索</h1>
+    <div class="header-menu-spacer" aria-hidden="true"></div>
   </div>
 </header>
 <div id="selected-tags-chk-script" class="selected-tags-container"></div>
@@ -334,6 +343,48 @@
     <div id="modal-body"></div>
   </div>
 </div>
+
+<section id="life-tool-overlay" class="life-tool-overlay" aria-label="ライフ計算ツール" hidden>
+  <div class="life-tool-shell">
+    <header class="life-tool-header">
+      <button class="life-back-button" type="button" onclick="closeLifeTool()" aria-label="カード検索に戻る">&#8592;</button>
+      <h2>ライフ計算ツール</h2>
+      <span class="life-header-spacer" aria-hidden="true"></span>
+    </header>
+
+    <div id="life-settings" class="life-settings">
+      <p class="life-eyebrow">MATCH SETUP</p>
+      <h3>対戦を準備</h3>
+      <fieldset class="life-option-group">
+        <legend>対戦人数</legend>
+        <div class="life-choice-row">
+          <label><input type="radio" name="life-player-count" value="2" checked><span>2人</span></label>
+          <label><input type="radio" name="life-player-count" value="3"><span>3人</span></label>
+          <label><input type="radio" name="life-player-count" value="4"><span>4人</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="life-option-group">
+        <legend>初期ライフ</legend>
+        <div class="life-choice-row">
+          <label><input type="radio" name="life-starting-total" value="4000" checked><span>4,000</span></label>
+          <label><input type="radio" name="life-starting-total" value="6000"><span>6,000</span></label>
+          <label><input type="radio" name="life-starting-total" value="8000"><span>8,000</span></label>
+        </div>
+      </fieldset>
+      <button class="life-start-button" type="button" onclick="startLifeGame()">スタート <span aria-hidden="true">&#8594;</span></button>
+    </div>
+
+    <div id="life-game" class="life-game" hidden>
+      <div class="life-board-wrap">
+        <div id="life-player-board" class="life-player-board"></div>
+        <div class="life-game-toolbar">
+          <button type="button" onclick="showLifeSettings()">設定</button>
+          <button type="button" onclick="resetLifeGame()">リセット</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- JavaScriptの読み込み -->
 <script src="main.js"></script>
