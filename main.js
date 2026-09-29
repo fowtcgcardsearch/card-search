@@ -42,6 +42,11 @@ let currentCardsETag = null;     // 現在読み込んでいるJSONの識別子�
 let currentVersionKey = null;    // 現在読み込んでいるJSONの更新履歴を保持する変数
 let activeKeywordTooltip = null; // 表示中のキーワードツールチップを保持する変数
 let keywordTooltipTimer = null;  // キーワードにマウスオーバーした時間を計測する変数
+let lifeGameSettings = { playerCount: 2, startingLife: 4000 };
+let lifePlayerTotals = [];
+let lifeFeedbackTotals = [];
+let lifeFeedbackTimers = [];
+let lifeTextMeasureContext = null;
 
 // ------------------------------------------------------------------------------------------------------------------
 // 初期表示用関数
@@ -61,12 +66,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      closeToolMenu();
+      closeLifeTool();
+    }
+  });
+
   // スクロールするたびに位置を記憶（負荷軽減のためrequestAnimationFrame等の利用も可）
   window.addEventListener('scroll', () => {
     // モーダル表示中（bodyがfixedのとき）は保存しない
     if (document.body.style.position !== 'fixed') {
       sessionStorage.setItem('scrollY', window.scrollY || document.documentElement.scrollTop);
     }
+  });
+
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('#life-player-board .life-total').forEach(fitLifeTotal);
   });
 
   // JSONファイルからプルダウンとカードデータを作成
@@ -458,6 +474,28 @@ function fadeAndRemove(element) {
       element.parentNode.removeChild(element);
     }
   }, 300);
+}
+
+/**
+ * メニューバーを開く関数
+ */
+function toggleToolMenu() {
+  const menu = document.getElementById('header-tool-menu');
+  const button = document.getElementById('header-menu-button');
+  const isOpen = !menu.hidden;
+  menu.hidden = isOpen;
+  button.setAttribute('aria-expanded', String(!isOpen));
+}
+
+/**
+ * メニューバーを閉じる関数
+ */
+function closeToolMenu() {
+  const menu = document.getElementById('header-tool-menu');
+  const button = document.getElementById('header-menu-button');
+  if (!menu || !button) return;
+  menu.hidden = true;
+  button.setAttribute('aria-expanded', 'false');
 }
 
 /**
@@ -2534,3 +2572,184 @@ function applySortWithoutUrlUpdate() {
 window.addEventListener('popstate', () => {
   handleUrlState();
 });
+
+// ------------------------------------------------------------------------------------------------------------------
+// 初期表示用関数
+// ------------------------------------------------------------------------------------------------------------------
+
+/**
+ * ライフ計算ツールを開く関数
+ */
+function openLifeTool() {
+  closeToolMenu();
+  document.getElementById('life-tool-overlay').hidden = false;
+  showLifeSettings();
+}
+
+/**
+ * ライフ計算ツールを閉じる関数
+ */
+function closeLifeTool() {
+  const overlay = document.getElementById('life-tool-overlay');
+  if (overlay) overlay.hidden = true;
+}
+
+/**
+ * ライフ計算を開始する関数
+ */
+function startLifeGame() {
+  lifeGameSettings = {
+    playerCount: Number(document.querySelector('input[name="life-player-count"]:checked').value),
+    startingLife: Number(document.querySelector('input[name="life-starting-total"]:checked').value)
+  };
+  lifePlayerTotals = Array(lifeGameSettings.playerCount).fill(lifeGameSettings.startingLife);
+  renderLifeGame();
+  document.getElementById('life-settings').hidden = true;
+  document.getElementById('life-game').hidden = false;
+  document.querySelector('.life-tool-header').hidden = true;
+  requestAnimationFrame(() => {
+    document.querySelectorAll('#life-player-board .life-total').forEach(fitLifeTotal);
+  });
+}
+
+/**
+ * ライフ計算のプレイヤー情報やボタンを描画する関数
+ */
+function renderLifeGame() {
+  lifeFeedbackTimers.forEach(playerTimers => {
+    if (playerTimers) clearTimeout(playerTimers);
+  });
+  lifeFeedbackTotals = lifePlayerTotals.map(() => 0);
+  lifeFeedbackTimers = lifePlayerTotals.map(() => null);
+
+  const board = document.getElementById('life-player-board');
+  board.className = `life-player-board life-player-count-${lifeGameSettings.playerCount}`;
+  board.replaceChildren();
+
+  lifePlayerTotals.forEach((total, index) => {
+    const player = document.createElement('section');
+    player.className = `life-player life-player-${index + 1}`;
+
+    const heading = document.createElement('h3');
+    heading.textContent = `PLAYER ${index + 1}`;
+    const value = document.createElement('output');
+    value.className = 'life-total';
+    value.classList.toggle('life-total-at-start', total === lifeGameSettings.startingLife);
+    value.setAttribute('aria-label', `プレイヤー${index + 1}のライフ`);
+    value.textContent = total.toLocaleString('ja-JP');
+
+    const decreaseHint = document.createElement('span');
+    decreaseHint.className = 'life-tap-hint life-tap-hint-left';
+    decreaseHint.textContent = '-100';
+    const increaseHint = document.createElement('span');
+    increaseHint.className = 'life-tap-hint life-tap-hint-right';
+    increaseHint.textContent = '+100';
+
+    const increaseFeedback = document.createElement('output');
+    increaseFeedback.className = 'life-delta-feedback life-delta-positive';
+    increaseFeedback.hidden = true;
+    const decreaseFeedback = document.createElement('output');
+    decreaseFeedback.className = 'life-delta-feedback life-delta-negative';
+    decreaseFeedback.hidden = true;
+
+    [-100, 100].forEach(amount => {
+      const tapZone = document.createElement('button');
+      tapZone.type = 'button';
+      tapZone.className = amount < 0 ? 'life-tap-zone life-tap-left' : 'life-tap-zone life-tap-right';
+      tapZone.setAttribute('aria-label', `プレイヤー${index + 1}のライフを${Math.abs(amount)} ${amount < 0 ? '減らす' : '増やす'}`);
+      tapZone.addEventListener('click', () => changeLifeTotal(index, amount));
+      player.appendChild(tapZone);
+    });
+
+    const controls = document.createElement('div');
+    controls.className = 'life-controls';
+    [-1000, -500, 500, 1000].forEach(amount => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = amount < 0 ? 'life-change-button life-decrease' : 'life-change-button life-increase';
+      button.textContent = `${amount > 0 ? '+' : ''}${amount.toLocaleString('ja-JP')}`;
+      button.setAttribute('aria-label', `プレイヤー${index + 1}のライフを${Math.abs(amount).toLocaleString('ja-JP')} ${amount > 0 ? '増やす' : '減らす'}`);
+      button.addEventListener('click', () => changeLifeTotal(index, amount));
+      controls.appendChild(button);
+    });
+
+    player.append(heading, value, controls, decreaseHint, increaseHint, increaseFeedback, decreaseFeedback);
+    board.appendChild(player);
+    fitLifeTotal(value);
+  });
+}
+
+/**
+ * 表示ライフを変更する関数
+ */
+function changeLifeTotal(playerIndex, amount) {
+  lifePlayerTotals[playerIndex] += amount;
+  const player = document.querySelectorAll('#life-player-board .life-player')[playerIndex];
+  const value = player.querySelector('.life-total');
+  value.textContent = lifePlayerTotals[playerIndex].toLocaleString('ja-JP');
+  value.classList.toggle('life-total-at-start', lifePlayerTotals[playerIndex] === lifeGameSettings.startingLife);
+  fitLifeTotal(value);
+  showLifeDelta(playerIndex, player, amount);
+}
+
+
+/**
+ * ライフの変動値を表示する関数
+ */
+function fitLifeTotal(value) {
+  const player = value.closest('.life-player');
+  if (!player || player.clientWidth === 0) return;
+
+  if (!lifeTextMeasureContext) {
+    lifeTextMeasureContext = document.createElement('canvas').getContext('2d');
+  }
+
+  const styles = window.getComputedStyle(value);
+  const baseSize = parseFloat(styles.getPropertyValue('--life-total-base-size')) || 104;
+  lifeTextMeasureContext.font = `${styles.fontWeight} ${baseSize}px ${styles.fontFamily}`;
+  const textWidth = lifeTextMeasureContext.measureText(value.textContent).width;
+  const availableWidth = Math.max(1, player.clientWidth - 104);
+  const fittedSize = Math.max(16, baseSize * Math.min(1, availableWidth / textWidth));
+  value.style.fontSize = `${fittedSize}px`;
+}
+
+/**
+ * 表示ライフを最新の値に変更する関数
+ */
+function showLifeDelta(playerIndex, player, amount) {
+  const previousTotal = lifeFeedbackTotals[playerIndex];
+  const nextTotal = previousTotal + amount;
+  const sign = nextTotal < 0 ? 'negative' : nextTotal > 0 ? 'positive' : previousTotal < 0 ? 'negative' : 'positive';
+  lifeFeedbackTotals[playerIndex] = nextTotal;
+
+  const otherSign = sign === 'positive' ? 'negative' : 'positive';
+  player.querySelector(`.life-delta-${otherSign}`).hidden = true;
+  const feedback = player.querySelector(`.life-delta-${sign}`);
+  feedback.textContent = `${sign === 'positive' ? '+' : '-'}${Math.abs(nextTotal).toLocaleString('ja-JP')}`;
+  feedback.hidden = false;
+
+  clearTimeout(lifeFeedbackTimers[playerIndex]);
+  lifeFeedbackTimers[playerIndex] = setTimeout(() => {
+    player.querySelector('.life-delta-positive').hidden = true;
+    player.querySelector('.life-delta-negative').hidden = true;
+    lifeFeedbackTotals[playerIndex] = 0;
+    lifeFeedbackTimers[playerIndex] = null;
+  }, 1600);
+}
+
+/**
+ * ライフ計算ツールの設定を開く関数
+ */
+function showLifeSettings() {
+  document.getElementById('life-game').hidden = true;
+  document.getElementById('life-settings').hidden = false;
+  document.querySelector('.life-tool-header').hidden = false;
+}
+
+/**
+ * ライフを初期状態にリセットする関数
+ */
+function resetLifeGame() {
+  lifePlayerTotals = Array(lifeGameSettings.playerCount).fill(lifeGameSettings.startingLife);
+  renderLifeGame();
+}
