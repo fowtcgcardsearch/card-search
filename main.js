@@ -2588,6 +2588,8 @@ function openLifeTool() {
   document.body.style.position = 'fixed';
   document.body.style.top = `-${lifeToolScrollY}px`;
   document.body.style.width = '100%';
+  document.documentElement.classList.add('life-tool-open');
+  document.body.classList.add('life-tool-open');
   document.getElementById('life-tool-overlay').hidden = false;
   showLifeSettings();
 }
@@ -2602,6 +2604,8 @@ function closeLifeTool() {
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.width = '';
+    document.documentElement.classList.remove('life-tool-open');
+    document.body.classList.remove('life-tool-open');
     window.scrollTo(0, lifeToolScrollY);
     lifeToolScrollY = null;
   }

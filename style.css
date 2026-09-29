@@ -115,10 +115,16 @@ body {
   inset: 0;
   z-index: 1200;
   overflow-y: auto;
+  overscroll-behavior-y: none;
   scrollbar-width: none;
   background: #101817;
   color: #f7f7f2;
   font-family: 'Avenir Next', 'Helvetica Neue', sans-serif;
+}
+
+html.life-tool-open,
+body.life-tool-open {
+  overscroll-behavior-y: none;
 }
 
 .life-tool-overlay::-webkit-scrollbar {
@@ -472,7 +478,7 @@ body {
 
 .life-delta-feedback {
   position: absolute;
-  top: calc(50% - 72px);
+  top: max(72px, calc(50% - 132px));
   z-index: 2;
   color: #fff;
   font-size: 24px;
