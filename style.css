@@ -115,9 +115,14 @@ body {
   inset: 0;
   z-index: 1200;
   overflow-y: auto;
+  scrollbar-width: none;
   background: #101817;
   color: #f7f7f2;
   font-family: 'Avenir Next', 'Helvetica Neue', sans-serif;
+}
+
+.life-tool-overlay::-webkit-scrollbar {
+  display: none;
 }
 
 .life-tool-shell {
@@ -294,6 +299,49 @@ body {
   cursor: pointer;
 }
 
+.life-confirm-dialog {
+  width: min(100% - 40px, 360px);
+  box-sizing: border-box;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: #242b29;
+  color: #f7f7f2;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+}
+
+.life-confirm-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.life-confirm-dialog p {
+  margin: 0 0 20px;
+  line-height: 1.6;
+}
+
+.life-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.life-confirm-actions button {
+  min-width: 84px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.life-confirm-actions button:last-child {
+  border-color: #0878c9;
+  background: #0878c9;
+}
+
 .life-player-board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -323,6 +371,12 @@ body {
 }
 
 .life-player-count-2 .life-player-2 h3 {
+  transform: translateY(24px);
+}
+
+.life-player-count-3 .life-player-1 h3,
+.life-player-count-4 .life-player-1 h3,
+.life-player-count-4 .life-player-4 h3 {
   transform: translateY(24px);
 }
 
@@ -484,25 +538,30 @@ body {
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
+.life-total-low {
+  color: #ff5c5c;
+  text-shadow: 0 2px 8px rgba(80, 0, 0, 0.65);
+}
+
 .life-controls {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  width: min(100%, 276px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 340px);
   pointer-events: none;
 }
 
 .life-change-button {
   min-width: 0;
-  min-height: 38px;
-  padding: 5px 3px;
+  min-height: 48px;
+  padding: 6px 8px;
   border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: 4px;
   background: rgba(20, 30, 29, 0.2);
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   pointer-events: auto;
@@ -535,8 +594,8 @@ body {
   }
 
   .life-change-button {
-    min-height: 36px;
-    font-size: 12px;
+    min-height: 48px;
+    font-size: 13px;
   }
 }
 

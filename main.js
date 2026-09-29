@@ -47,6 +47,8 @@ let lifePlayerTotals = [];
 let lifeFeedbackTotals = [];
 let lifeFeedbackTimers = [];
 let lifeTextMeasureContext = null;
+let lifeToolScrollY = null;
+let lifeConfirmAction = null;
 
 // ------------------------------------------------------------------------------------------------------------------
 // 初期表示用関数
@@ -2582,6 +2584,10 @@ window.addEventListener('popstate', () => {
  */
 function openLifeTool() {
   closeToolMenu();
+  lifeToolScrollY = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${lifeToolScrollY}px`;
+  document.body.style.width = '100%';
   document.getElementById('life-tool-overlay').hidden = false;
   showLifeSettings();
 }
@@ -2592,6 +2598,13 @@ function openLifeTool() {
 function closeLifeTool() {
   const overlay = document.getElementById('life-tool-overlay');
   if (overlay) overlay.hidden = true;
+  if (lifeToolScrollY !== null) {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, lifeToolScrollY);
+    lifeToolScrollY = null;
+  }
 }
 
 /**
@@ -2635,6 +2648,7 @@ function renderLifeGame() {
     const value = document.createElement('output');
     value.className = 'life-total';
     value.classList.toggle('life-total-at-start', total === lifeGameSettings.startingLife);
+    value.classList.toggle('life-total-low', total <= 1000);
     value.setAttribute('aria-label', `プレイヤー${index + 1}のライフ`);
     value.textContent = total.toLocaleString('ja-JP');
 
@@ -2663,7 +2677,7 @@ function renderLifeGame() {
 
     const controls = document.createElement('div');
     controls.className = 'life-controls';
-    [-1000, -500, 500, 1000].forEach(amount => {
+    [-500, 500, -1000, 1000].forEach(amount => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = amount < 0 ? 'life-change-button life-decrease' : 'life-change-button life-increase';
@@ -2688,6 +2702,7 @@ function changeLifeTotal(playerIndex, amount) {
   const value = player.querySelector('.life-total');
   value.textContent = lifePlayerTotals[playerIndex].toLocaleString('ja-JP');
   value.classList.toggle('life-total-at-start', lifePlayerTotals[playerIndex] === lifeGameSettings.startingLife);
+  value.classList.toggle('life-total-low', lifePlayerTotals[playerIndex] <= 1000);
   fitLifeTotal(value);
   showLifeDelta(playerIndex, player, amount);
 }
@@ -2747,9 +2762,45 @@ function showLifeSettings() {
 }
 
 /**
+ * ライフツールの確認ダイアログを開く関数
+ */
+function requestLifeConfirmation(message, action) {
+  document.getElementById('life-confirm-message').textContent = message;
+  lifeConfirmAction = action;
+  document.getElementById('life-confirm-dialog').showModal();
+}
+
+/**
+ * 確認ダイアログで「はい」を選択したときの処理
+ */
+function confirmLifeAction() {
+  const action = lifeConfirmAction;
+  lifeConfirmAction = null;
+  document.getElementById('life-confirm-dialog').close();
+  if (action) action();
+}
+
+/**
+ * 確認ダイアログをキャンセルする関数
+ */
+function cancelLifeConfirmation() {
+  lifeConfirmAction = null;
+  document.getElementById('life-confirm-dialog').close();
+}
+
+/**
+ * 確認後にライフ計算ツールの設定を開く関数
+ */
+function confirmShowLifeSettings() {
+  requestLifeConfirmation('ゲームを中断して設定画面に戻ってよろしいですか？', showLifeSettings);
+}
+
+/**
  * ライフを初期状態にリセットする関数
  */
 function resetLifeGame() {
-  lifePlayerTotals = Array(lifeGameSettings.playerCount).fill(lifeGameSettings.startingLife);
-  renderLifeGame();
+  requestLifeConfirmation('全プレイヤーのライフを初期値にリセットしてよろしいですか？', () => {
+    lifePlayerTotals = Array(lifeGameSettings.playerCount).fill(lifeGameSettings.startingLife);
+    renderLifeGame();
+  });
 }

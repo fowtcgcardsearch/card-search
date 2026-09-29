@@ -378,11 +378,19 @@
       <div class="life-board-wrap">
         <div id="life-player-board" class="life-player-board"></div>
         <div class="life-game-toolbar">
-          <button type="button" onclick="showLifeSettings()">設定</button>
+          <button type="button" onclick="confirmShowLifeSettings()">設定</button>
           <button type="button" onclick="resetLifeGame()">リセット</button>
         </div>
       </div>
     </div>
+
+    <dialog id="life-confirm-dialog" class="life-confirm-dialog" aria-labelledby="life-confirm-message">
+      <p id="life-confirm-message"></p>
+      <div class="life-confirm-actions">
+        <button type="button" onclick="cancelLifeConfirmation()">キャンセル</button>
+        <button type="button" onclick="confirmLifeAction()">はい</button>
+      </div>
+    </dialog>
   </div>
 </section>
 
