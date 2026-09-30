@@ -68,9 +68,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  document.addEventListener('click', event => {
+    const menu = document.getElementById('header-tool-menu');
+    if (menu && !menu.hidden && !event.target.closest('.header-menu-wrap')) {
+      closeToolMenu();
+    }
+  });
+
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
       closeToolMenu();
+      const confirmationDialog = document.getElementById('life-confirm-dialog');
+      if (confirmationDialog?.open) return;
+      if (!document.getElementById('life-options').hidden) {
+        closeLifeOptions();
+        return;
+      }
       closeLifeTool();
     }
   });
@@ -2600,6 +2613,7 @@ function openLifeTool() {
 function closeLifeTool() {
   const overlay = document.getElementById('life-tool-overlay');
   if (overlay) overlay.hidden = true;
+  document.getElementById('life-options').hidden = true;
   if (lifeToolScrollY !== null) {
     document.body.style.position = '';
     document.body.style.top = '';
@@ -2609,6 +2623,31 @@ function closeLifeTool() {
     window.scrollTo(0, lifeToolScrollY);
     lifeToolScrollY = null;
   }
+}
+
+function openLifeOptions() {
+  document.getElementById('life-game').hidden = true;
+  document.getElementById('life-options').hidden = false;
+  document.getElementById('life-dice-result').hidden = true;
+}
+
+function closeLifeOptions() {
+  document.getElementById('life-options').hidden = true;
+  document.getElementById('life-game').hidden = false;
+}
+
+function rollLifeDice() {
+  const sides = Number(document.getElementById('life-dice-sides').value);
+  const count = Number(document.getElementById('life-dice-count').value);
+  const results = Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
+  const result = document.getElementById('life-dice-result');
+  const values = document.createElement('span');
+  values.textContent = results.join('  /  ');
+  const total = document.createElement('span');
+  total.className = 'life-dice-total';
+  total.textContent = `合計: ${results.reduce((sum, value) => sum + value, 0)}`;
+  result.replaceChildren(values, total);
+  result.hidden = false;
 }
 
 /**
@@ -2760,6 +2799,7 @@ function showLifeDelta(playerIndex, player, amount) {
  * ライフ計算ツールの設定を開く関数
  */
 function showLifeSettings() {
+  document.getElementById('life-options').hidden = true;
   document.getElementById('life-game').hidden = true;
   document.getElementById('life-settings').hidden = false;
   document.querySelector('.life-tool-header').hidden = false;
@@ -2800,11 +2840,19 @@ function confirmShowLifeSettings() {
 }
 
 /**
+ * 確認後にライフ計算ツールを閉じ検索画面に戻る関数
+ */
+function confirmReturnToSearch() {
+  requestLifeConfirmation('ゲームを中断して検索画面に戻ってよろしいですか？', closeLifeTool);
+}
+
+/**
  * ライフを初期状態にリセットする関数
  */
 function resetLifeGame() {
   requestLifeConfirmation('全プレイヤーのライフを初期値にリセットしてよろしいですか？', () => {
     lifePlayerTotals = Array(lifeGameSettings.playerCount).fill(lifeGameSettings.startingLife);
     renderLifeGame();
+    closeLifeOptions();
   });
 }
