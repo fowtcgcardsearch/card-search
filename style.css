@@ -16,9 +16,9 @@ body {
   /* ボタンなどのアクセントカラーと相性の良い鮮やかなロイヤルブルー系 */
   background: linear-gradient(135deg, #1d4ed8, #2563eb); 
   color: #ffffff;
-  padding: 20px;
+  padding: 1px 1px;
   /* ヘッダーと下のコンテンツ（タブ）の間に余白を追加 */
-  margin-bottom: 32px; 
+  margin: -15px -15px 32px;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
@@ -35,6 +35,7 @@ body {
   cursor: pointer;
   margin: 0;
   font-size: 1.6rem;
+  line-height: 1;
   font-weight: 700;
   text-align: center;
   color: #ffffff;
@@ -296,13 +297,145 @@ body.life-tool-open {
 }
 
 .life-game-toolbar button {
-  padding: 8px 11px;
+  min-width: 90px;
+  min-height: 42px;
+  padding: 8px 14px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 4px;
   background: rgba(16, 24, 23, 0.25);
   color: #fff;
   font-size: 13px;
   cursor: pointer;
+}
+
+.life-options {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #242b29 0%, #5b5550 48%, #a27a70 100%);
+}
+
+.life-options-header {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  width: min(100%, 600px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: max(14px, env(safe-area-inset-top)) 18px 14px;
+}
+
+.life-options-header h2 {
+  margin: 0;
+  text-align: center;
+  font-size: 18px;
+}
+
+.life-options-close {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.life-options-content {
+  display: flex;
+  width: min(100% - 36px, 460px);
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 12px 0 max(24px, env(safe-area-inset-bottom));
+}
+
+.life-option-action {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 5px;
+  background: rgba(16, 24, 23, 0.24);
+  color: #fff;
+  text-align: left;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.life-option-action:hover,
+.life-dice-roll:hover {
+  background: rgba(16, 24, 23, 0.45);
+}
+
+.life-dice-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 5px;
+  background: rgba(16, 24, 23, 0.16);
+}
+
+.life-dice-options legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.life-dice-options label {
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+}
+
+.life-dice-options select {
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  background: #f7f7f2;
+  color: #202826;
+  font: inherit;
+}
+
+.life-dice-roll {
+  min-height: 42px;
+  grid-column: 1 / -1;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 4px;
+  background: rgba(16, 24, 23, 0.35);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.life-dice-result {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 4px;
+  padding: 10px;
+  color: #fff;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.life-dice-total {
+  font-size: 16px;
+}
+
+.life-option-return {
+  margin-top: auto;
+  background: #0878c9;
 }
 
 .life-confirm-dialog {
