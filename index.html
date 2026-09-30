@@ -354,7 +354,7 @@
 
     <div id="life-settings" class="life-settings">
       <p class="life-eyebrow">MATCH SETUP</p>
-      <h3>対戦を準備</h3>
+      <h3>対戦準備</h3>
       <fieldset class="life-option-group">
         <legend>対戦人数</legend>
         <div class="life-choice-row">
@@ -378,9 +378,46 @@
       <div class="life-board-wrap">
         <div id="life-player-board" class="life-player-board"></div>
         <div class="life-game-toolbar">
-          <button type="button" onclick="confirmShowLifeSettings()">設定</button>
-          <button type="button" onclick="resetLifeGame()">リセット</button>
+          <button type="button" onclick="openLifeOptions()">オプション</button>
         </div>
+      </div>
+    </div>
+
+    <div id="life-options" class="life-options" hidden>
+      <header class="life-options-header">
+        <button class="life-options-close" type="button" onclick="closeLifeOptions()" aria-label="オプションを閉じる">&times;</button>
+        <h2>オプション</h2>
+        <span aria-hidden="true"></span>
+      </header>
+      <div class="life-options-content">
+        <button class="life-option-action" type="button" onclick="confirmShowLifeSettings()">対戦準備に戻る</button>
+        <button class="life-option-action" type="button" onclick="resetLifeGame()">リセット</button>
+        <fieldset class="life-dice-options">
+          <legend>サイコロを振る</legend>
+          <label>種類
+            <select id="life-dice-sides">
+              <option value="4">4面</option>
+              <option value="6" selected>6面</option>
+              <option value="8">8面</option>
+              <option value="10">10面</option>
+              <option value="12">12面</option>
+              <option value="20">20面</option>
+            </select>
+          </label>
+          <label>個数
+            <select id="life-dice-count">
+              <option value="1" selected>1個</option>
+              <option value="2">2個</option>
+              <option value="3">3個</option>
+              <option value="4">4個</option>
+              <option value="5">5個</option>
+              <option value="6">6個</option>
+            </select>
+          </label>
+          <button class="life-dice-roll" type="button" onclick="rollLifeDice()">振る</button>
+          <output id="life-dice-result" class="life-dice-result" aria-live="polite" hidden></output>
+        </fieldset>
+        <button class="life-option-action life-option-return" type="button" onclick="confirmReturnToSearch()">検索に戻る</button>
       </div>
     </div>
 
