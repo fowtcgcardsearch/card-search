@@ -97,6 +97,25 @@ function makeLinkedCardText(text, keywords, cardHrefByName) {
 	return processedText;
 }
 
+function makeDetailText(text, fallback, keywords, cardHrefByName, lang, textStyle) {
+	const source = text || fallback;
+	const soloModeIndex = source.search(/\[Solo Mode\]/i);
+	const renderText = (value) => makeLinkedCardText(value, keywords, cardHrefByName);
+	const styleAttribute = textStyle ? ` style="${textStyle}"` : '';
+
+	if (soloModeIndex === -1) {
+		return `<div class="text-block" lang="${lang}"${styleAttribute}>${renderText(source)}</div>`;
+	}
+
+	const regularText = source.slice(0, soloModeIndex).trimEnd();
+	const soloModeText = source.slice(soloModeIndex + '[Solo Mode]'.length).trim();
+	return `${regularText ? `<div class="text-block" lang="${lang}"${styleAttribute}>${renderText(regularText)}</div>` : ''}
+		<div style="display:flex; align-items:stretch; overflow:hidden; margin-bottom:8px; border:3px solid #D3D3D3; background:#D3D3D3;">
+			<div style="display:flex; align-items:center; justify-content:center; flex:0 0 24px; padding:6px 2px; background:#171717; color:#fff; font-size:11px; font-weight:bold; writing-mode:vertical-rl; transform:rotate(180deg);">Solo Mode</div>
+			<div class="text-block" lang="${lang}" style="flex:1; margin:0; border:0; border-radius:0; background:transparent;${textStyle ? ` ${textStyle};` : ''}">${renderText(soloModeText)}</div>
+		</div>`;
+}
+
 function makeAttributeBadges(values) {
 	return asList(values).map((value) => {
 		const attribute = String(value).trim();
@@ -177,8 +196,8 @@ function makeCardDetailHtml(card, cards, keywords, cardHrefByName, cardReference
 	}).join('');
 	const banSection = banItems ? `<section class="modal-section" style="border-left: 3px solid #ef4444;"><div class="modal-section-title" style="color: #dc2626;">禁止情報</div>${banItems}</section>` : '';
 	const illustratorLinks = asList(card.illustrators).map((illustrator) => makeSearchLink('illustrator', illustrator, illustrator)).join('・') || '-';
-	const textEn = makeLinkedCardText(card.enText || '(No text available)', keywords, cardHrefByName);
-	const textJp = makeLinkedCardText(card.jpText || '（効果テキストなし）', keywords, cardHrefByName);
+	const textEn = makeDetailText(card.enText, '(No text available)', keywords, cardHrefByName, 'en', 'color:#475569; font-size:12px;');
+	const textJp = makeDetailText(card.jpText, '（効果テキストなし）', keywords, cardHrefByName, 'ja', 'color:#0f172a; font-weight:500;');
 
 	return `
 		<header class="modal-title">
@@ -195,8 +214,8 @@ function makeCardDetailHtml(card, cards, keywords, cardHrefByName, cardReference
 		${makeStatusSection(card)}
 		<section class="modal-section">
 			<div class="modal-section-title">テキスト</div>
-			<div class="text-block" lang="en" style="color: #475569; font-size: 12px;">${textEn}</div>
-			<div class="text-block" lang="ja" style="color: #0f172a; font-weight: 500;">${textJp}</div>
+			${textEn}
+			${textJp}
 		</section>
 		${flavorSection}
 		<section class="modal-section">
