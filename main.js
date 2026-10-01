@@ -1683,6 +1683,25 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
     // 外部サイトへのリンクボタンを生成
     const officialLink = getOfficialLink(card.id);
 
+    const renderDetailText = (text, fallback, textStyle = '') => {
+      const source = text || fallback;
+      const soloModeIndex = source.search(/\[Solo Mode\]/i);
+      const renderText = value => renderCardLinks(renderKeywordTooltips(escapeHtml(value)));
+      const styleAttribute = textStyle ? ` style="${textStyle}"` : '';
+
+      if (soloModeIndex === -1) {
+        return `<div class="text-block"${styleAttribute}>${renderText(source)}</div>`;
+      }
+
+      const regularText = source.slice(0, soloModeIndex).trimEnd();
+      const soloModeText = source.slice(soloModeIndex + '[Solo Mode]'.length).trim();
+      return `${regularText ? `<div class="text-block"${styleAttribute}>${renderText(regularText)}</div>` : ''}
+        <div style="display:flex; align-items:stretch; overflow:hidden; margin-bottom:8px; border:3px solid #D3D3D3; background:#D3D3D3;">
+          <div style="display:flex; align-items:center; justify-content:center; flex:0 0 24px; padding:6px 2px; background:#171717; color:#fff; font-size:11px; font-weight:bold; writing-mode:vertical-rl; transform:rotate(180deg);">Solo Mode</div>
+          <div class="text-block" style="flex:1; margin:0; border:0; border-radius:0; background:transparent;${textStyle ? ` ${textStyle};` : ''}">${renderText(soloModeText)}</div>
+        </div>`;
+    };
+
     modalContent += `
       <div class="modal-title">
         <h2 style="margin: 0; font-size: 20px; color: #1e293b;">${card.enName || '（No English Name）'}
@@ -1709,8 +1728,8 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
 
       <div class="modal-section">
         <div class="modal-section-title">テキスト</div>
-        <div class="text-block" style="color: #475569; font-size: 12px;">${renderCardLinks(renderKeywordTooltips(escapeHtml(card.enText || '(No text available)')))}</div>
-        <div class="text-block" style="color: #0f172a; font-weight: 500;">${renderCardLinks(renderKeywordTooltips(escapeHtml(card.jpText || '（効果テキストなし）')))}</div>
+        ${renderDetailText(card.enText, '(No text available)', 'color:#475569; font-size:12px;')}
+        ${renderDetailText(card.jpText, '（効果テキストなし）', 'color:#0f172a; font-weight:500;')}
       </div>
 
       ${flavorSectionHtml}
