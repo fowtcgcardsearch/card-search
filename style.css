@@ -915,6 +915,67 @@ body.life-tool-open {
   #card-list {
     grid-template-columns: 1fr; /* スマホでは1列 */
   }
+
+  .controls-container {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .controls-row > div {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 10px 12px;
+  }
+
+  .page-size-selector {
+    display: contents;
+  }
+
+  #search-count {
+    grid-column: 1 / -1;
+    margin-right: 0 !important;
+    font-size: 15px;
+  }
+
+  #page-size-select-wrapper,
+  #format-select-wrapper {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+  }
+
+  #page-size-select-wrapper[style*="display: none"] + #format-select-wrapper {
+    grid-column: 1 / -1;
+  }
+
+  .page-size-selector select,
+  .sort-selector select {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+  }
+
+  .sort-selector {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    font-size: 13px;
+  }
+
+  .pagination-container {
+    gap: 6px;
+  }
+
+  .pagination-container .page-btn {
+    min-width: 42px;
+    padding: 8px 10px;
+  }
 }
 
 /* 検索結果のカードデザイン */

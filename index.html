@@ -225,9 +225,6 @@
           <div id="filter-container-expansion" class="checkbox-grid"></div>
         </div>
       </div>
-      <div class="checkbox-group" style="margin-top:5px;">
-        <label><input type="checkbox" id="chk-paradox" >パラドックスカードのみ表示</label>
-      </div>
     </div>
     <div class="form-group">
       <div class="filter-group">
@@ -291,6 +288,14 @@
             <option value="50">50件</option>
             <option value="100">100件</option>
             <option value="all">全件</option>
+          </select>
+        </span>
+        <span id="format-select-wrapper">
+          フォーマット:
+          <select id="format-select" onchange="changeFormat()">
+            <option value="all" selected>すべて</option>
+            <option value="paradox">パラドックス</option>
+            <option value="cluster">クラスタ</option>
           </select>
         </span>
       </div>

@@ -17,7 +17,6 @@ const INITIAL_FORM_VALUES = {
   'chara-time': false,
   'chara-void': false,
   'chara-x': false,
-  'chk-paradox': false,
   'det-search-mode': 'fuzzy',
   'det-attri-mode': 'any',
   'det-cost-op': 'eq',
@@ -34,6 +33,7 @@ let allCards = [];               // カード全量
 let latestCardMap = {};          // 最新のカードとカードNoのマップ
 let cardReferenceMap = {};       // 逆引き参照マップ
 let filteredCards = [];          // 各検索条件によりフィルターされたカード
+let searchResultCards = [];      // フォーマット適用前の検索結果
 let currentPage = 1;             // 現在のページ数
 let raceMapping = {};            // 種族を英語名と日本語名でマッピングするための補助変数
 let keywords = {};               // キーワード能力を管理しツールチップを作成するための補助変数
@@ -770,6 +770,8 @@ function searchCards(isRestoring = false) {
       return keywords.every(kw => target.includes(kw));
     });
   }
+  searchResultCards = [...filteredCards];
+  applyFormatFilter();
   displayCards(isRestoring);
 }
 
@@ -809,7 +811,6 @@ function searchDetailedCards(isRestoring = false) {
   const atkOp = document.getElementById('det-atk-op')?.value || 'eq';
   const def = document.getElementById('det-def')?.value || '';
   const defOp = document.getElementById('det-def-op')?.value || 'eq';
-  const chkParadox = document.getElementById('chk-paradox')?.checked || false;
 
   // 複数選択された値を取得するヘルパー関数
   const getCheckedValues = (cls) => {
@@ -898,9 +899,6 @@ function searchDetailedCards(isRestoring = false) {
     if (atk !== "" && !checkStatus(card.atk, atkOp, atk)) return false;
     if (def !== "" && !checkStatus(card.def, defOp, def)) return false;
 
-    // パラドックスカードのみ表示にチェックが入っていて、かつ値が空なら弾く
-    if (chkParadox && (!card.paradox || card.paradox.trim() === "")) return false;
-
     // OR検索ロジック（配列に値がある場合、いずれか一つでも含まれていればOK）
     if (types.length > 0 && (!card.types || !card.types.some(t => types.includes(t)))) return false;
     if (races.length > 0 && (!card.races || !card.races.some(r => races.some(fr => r.toLowerCase() === fr.toLowerCase())))) return false;
@@ -913,6 +911,8 @@ function searchDetailedCards(isRestoring = false) {
   
   // 最後に検索フォームを閉じる
   document.getElementById('detailed-inputs').style.display = 'none';
+  searchResultCards = [...filteredCards];
+  applyFormatFilter();
   displayCards(isRestoring);
 }
 
@@ -983,7 +983,39 @@ function searchImportedCards(isRestoring = false) {
   });
 
   filteredCards = [...primaryCards, ...extraCards];
+  searchResultCards = [...filteredCards];
+  applyFormatFilter();
   displayCards(isRestoring);
+}
+
+function applyFormatFilter() {
+  const formatSelect = document.getElementById('format-select');
+  const formatWrapper = document.getElementById('format-select-wrapper');
+  const hasParadoxCards = searchResultCards.some(card => String(card.paradox ?? '').trim() !== '');
+  const hasClusterCards = searchResultCards.some(card => String(card.paradox ?? '').trim() === '☆');
+
+  if (formatWrapper) formatWrapper.hidden = !hasParadoxCards;
+  const clusterOption = formatSelect?.querySelector('option[value="cluster"]');
+  if (clusterOption) clusterOption.disabled = !hasClusterCards;
+
+  if (!hasParadoxCards || (formatSelect?.value === 'cluster' && !hasClusterCards)) {
+    if (formatSelect) formatSelect.value = 'all';
+  }
+
+  const format = formatSelect?.value || 'all';
+  if (format === 'paradox') {
+    filteredCards = searchResultCards.filter(card => String(card.paradox ?? '').trim() !== '');
+  } else if (format === 'cluster') {
+    filteredCards = searchResultCards.filter(card => String(card.paradox ?? '').trim() === '☆');
+  } else {
+    filteredCards = [...searchResultCards];
+  }
+}
+
+function changeFormat() {
+  currentPage = 1;
+  applyFormatFilter();
+  applySort();
 }
 
 /**
@@ -2300,9 +2332,11 @@ function updateUrlParams(skipHistory = false) {
   const state = {
     tab: document.querySelector('.tab.active')?.id.replace('tab-', '') || 'basic',
     size: document.getElementById("page-size-select")?.value || '30',
+    format: document.getElementById('format-select')?.value || 'all',
     sort: document.getElementById("sort-select")?.value || 'date-desc',
     p: currentPage
   };
+  if (state.format === 'all') delete state.format;
 
   if (state.tab === 'basic') {
     state.q = document.getElementById("search-input")?.value || '';
@@ -2397,10 +2431,6 @@ function updateUrlParams(skipHistory = false) {
     const illus = getChecked('chk-illustrator');
     if (illus.length > 0) state.illus = illus;
 
-    if (document.getElementById('chk-paradox')?.checked !== INITIAL_FORM_VALUES['chk-paradox']) {
-      if (document.getElementById('chk-paradox')?.checked) state.paradox = 1;
-    }
-
   } else if (state.tab === 'import') {
     state.import = document.getElementById('import-text-input')?.value || '';
   }
@@ -2433,6 +2463,8 @@ function updateUrlParams(skipHistory = false) {
 function handleUrlState() {
   const params = new URLSearchParams(window.location.search);
   const compressedData = params.get('d');
+  const formatSelect = document.getElementById('format-select');
+  if (formatSelect) formatSelect.value = 'all';
   if (!compressedData) {
     const property = params.get('property');
     const value = params.get('value');
@@ -2464,6 +2496,11 @@ function handleUrlState() {
 
   // 2. 基本項目の復元
   switchTab(state.tab || 'basic');
+  if (formatSelect) {
+    formatSelect.value = ['all', 'paradox', 'cluster'].includes(state.format)
+      ? state.format
+      : (state.paradox === 1 ? 'paradox' : 'all');
+  }
   if (state.size && document.getElementById("page-size-select")) {
     document.getElementById("page-size-select").value = state.size;
   }
@@ -2535,10 +2572,6 @@ function handleUrlState() {
     restoreCheckboxes(state.exps, 'chk-exp', 'chk-exp');
     restoreCheckboxes(state.rarities, 'chk-rarity', 'chk-rarity');
     restoreCheckboxes(state.illus, 'chk-illustrator', 'chk-illustrator');
-
-    if (state.paradox !== undefined) {
-      document.getElementById('chk-paradox').checked = (state.paradox === 1);
-    }
 
     searchDetailedCards(true);
 
