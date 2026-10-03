@@ -42,8 +42,22 @@ let currentCardsETag = null;     // 現在読み込んでいるJSONの識別子�
 let currentVersionKey = null;    // 現在読み込んでいるJSONの更新履歴を保持する変数
 let activeKeywordTooltip = null; // 表示中のキーワードツールチップを保持する変数
 let keywordTooltipTimer = null;  // キーワードにマウスオーバーした時間を計測する変数
+const LIFE_ITEM_TYPES = [
+  { symbol: '◆', name: '光の宝石', tone: 'light' },
+  { symbol: '◆', name: '炎の宝石', tone: 'fire' },
+  { symbol: '◆', name: '水の宝石', tone: 'water' },
+  { symbol: '◆', name: '風の宝石', tone: 'wind' },
+  { symbol: '◆', name: '闇の宝石', tone: 'dark' },
+  { symbol: '◈', name: '光のクリスタル', tone: 'light' },
+  { symbol: '◈', name: '闇のクリスタル', tone: 'dark' },
+  { symbol: '◉', name: '水のクルー', tone: 'water' },
+  { symbol: '✦', name: 'その他', tone: 'other' }
+];
 let lifeGameSettings = { playerCount: 2, startingLife: 4000 };
 let lifePlayerTotals = [];
+let lifePlayerCrystals = [];
+let lifePlayerItems = [];
+let activeLifeItemPlayer = null;
 let lifeFeedbackTotals = [];
 let lifeFeedbackTimers = [];
 let lifeTextMeasureContext = null;
@@ -80,6 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
       closeToolMenu();
       const confirmationDialog = document.getElementById('life-confirm-dialog');
       if (confirmationDialog?.open) return;
+      if (!document.getElementById('life-item-manager').hidden) {
+        closeLifeItemManager();
+        return;
+      }
       if (!document.getElementById('life-options').hidden) {
         closeLifeOptions();
         return;
@@ -2666,6 +2684,8 @@ function closeLifeTool() {
   const overlay = document.getElementById('life-tool-overlay');
   if (overlay) overlay.hidden = true;
   document.getElementById('life-options').hidden = true;
+  document.getElementById('life-item-manager').hidden = true;
+  activeLifeItemPlayer = null;
   if (lifeToolScrollY !== null) {
     document.body.style.position = '';
     document.body.style.top = '';
@@ -2686,6 +2706,115 @@ function openLifeOptions() {
 function closeLifeOptions() {
   document.getElementById('life-options').hidden = true;
   document.getElementById('life-game').hidden = false;
+}
+
+function openLifeItemManager(playerIndex) {
+  activeLifeItemPlayer = playerIndex;
+  document.getElementById('life-game').hidden = true;
+  document.getElementById('life-item-manager').hidden = false;
+  document.getElementById('life-item-manager-title').textContent = `PLAYER ${playerIndex + 1} アイテム`;
+  renderLifeItemManager();
+}
+
+function closeLifeItemManager() {
+  document.getElementById('life-item-manager').hidden = true;
+  document.getElementById('life-game').hidden = false;
+  activeLifeItemPlayer = null;
+}
+
+function renderLifeItemManager() {
+  const list = document.getElementById('life-item-list');
+  list.replaceChildren();
+
+  LIFE_ITEM_TYPES.forEach((item, itemIndex) => {
+    const row = document.createElement('div');
+    row.className = 'life-item-row';
+
+    const identity = document.createElement('div');
+    identity.className = 'life-item-identity';
+    const symbol = document.createElement('span');
+    symbol.className = `life-item-symbol life-item-tone-${item.tone}`;
+    symbol.setAttribute('aria-hidden', 'true');
+    symbol.textContent = item.symbol;
+    const name = document.createElement('span');
+    name.className = 'life-item-name';
+    name.textContent = item.name;
+    identity.append(symbol, name);
+
+    const count = document.createElement('input');
+    count.type = 'number';
+    count.inputMode = 'numeric';
+    count.min = '0';
+    count.step = '1';
+    count.className = 'life-item-count';
+    count.setAttribute('aria-label', `${item.name}の所持数`);
+    count.value = String(lifePlayerItems[activeLifeItemPlayer][itemIndex]);
+    count.addEventListener('input', () => {
+      if (count.value === '') return;
+      const nextCount = Number(count.value);
+      if (Number.isSafeInteger(nextCount) && nextCount >= 0) {
+        setLifeItemCount(itemIndex, nextCount, count);
+      }
+    });
+    count.addEventListener('change', () => {
+      const enteredCount = Number(count.value);
+      const currentCount = lifePlayerItems[activeLifeItemPlayer][itemIndex];
+      const nextCount = count.value !== '' && Number.isSafeInteger(enteredCount) && enteredCount >= 0
+        ? enteredCount
+        : currentCount;
+      setLifeItemCount(itemIndex, nextCount, count);
+    });
+
+    const decrement = document.createElement('button');
+    decrement.type = 'button';
+    decrement.className = 'life-item-stepper';
+    decrement.textContent = '−';
+    decrement.setAttribute('aria-label', `${item.name}を1個減らす`);
+    decrement.addEventListener('click', () => changeLifeItemCount(itemIndex, -1, count));
+
+    const increment = document.createElement('button');
+    increment.type = 'button';
+    increment.className = 'life-item-stepper';
+    increment.textContent = '+';
+    increment.setAttribute('aria-label', `${item.name}を1個増やす`);
+    increment.addEventListener('click', () => changeLifeItemCount(itemIndex, 1, count));
+
+    row.append(identity, decrement, count, increment);
+    list.appendChild(row);
+  });
+}
+
+function changeLifeItemCount(itemIndex, amount, countInput) {
+  const playerIndex = activeLifeItemPlayer;
+  const currentCount = lifePlayerItems[playerIndex][itemIndex];
+  const nextCount = Math.max(0, currentCount + amount);
+  setLifeItemCount(itemIndex, nextCount, countInput);
+}
+
+function setLifeItemCount(itemIndex, nextCount, countInput) {
+  const playerIndex = activeLifeItemPlayer;
+  lifePlayerItems[playerIndex][itemIndex] = nextCount;
+  countInput.value = String(nextCount);
+  updateLifeItemDisplay(playerIndex);
+}
+
+function updateLifeItemDisplay(playerIndex) {
+  const display = document.querySelector(`.life-player-${playerIndex + 1} .life-item-display`);
+  if (!display) return;
+  display.replaceChildren();
+
+  LIFE_ITEM_TYPES.forEach((item, itemIndex) => {
+    const count = lifePlayerItems[playerIndex][itemIndex];
+    if (count === 0) return;
+
+    const badge = document.createElement('span');
+    badge.className = `life-item-owned life-item-tone-${item.tone}`;
+    badge.setAttribute('aria-label', `${item.name} ${count}個`);
+    badge.title = `${item.name}: ${count}`;
+    badge.textContent = `${item.symbol}${count}`;
+    display.appendChild(badge);
+  });
+  display.classList.toggle('has-items', display.childElementCount > 0);
 }
 
 function rollLifeDice() {
@@ -2711,6 +2840,8 @@ function startLifeGame() {
     startingLife: Number(document.querySelector('input[name="life-starting-total"]:checked').value)
   };
   lifePlayerTotals = Array(lifeGameSettings.playerCount).fill(lifeGameSettings.startingLife);
+  lifePlayerCrystals = Array(lifeGameSettings.playerCount).fill(0);
+  lifePlayerItems = Array.from({ length: lifeGameSettings.playerCount }, () => LIFE_ITEM_TYPES.map(() => 0));
   renderLifeGame();
   document.getElementById('life-settings').hidden = true;
   document.getElementById('life-game').hidden = false;
@@ -2747,12 +2878,15 @@ function renderLifeGame() {
     value.setAttribute('aria-label', `プレイヤー${index + 1}のライフ`);
     value.textContent = total.toLocaleString('ja-JP');
 
+    const tapHints = document.createElement('div');
+    tapHints.className = 'life-tap-hints';
     const decreaseHint = document.createElement('span');
     decreaseHint.className = 'life-tap-hint life-tap-hint-left';
     decreaseHint.textContent = '-100';
     const increaseHint = document.createElement('span');
     increaseHint.className = 'life-tap-hint life-tap-hint-right';
     increaseHint.textContent = '+100';
+    tapHints.append(decreaseHint, increaseHint);
 
     const increaseFeedback = document.createElement('output');
     increaseFeedback.className = 'life-delta-feedback life-delta-positive';
@@ -2760,6 +2894,49 @@ function renderLifeGame() {
     const decreaseFeedback = document.createElement('output');
     decreaseFeedback.className = 'life-delta-feedback life-delta-negative';
     decreaseFeedback.hidden = true;
+
+    const crystalCounter = document.createElement('div');
+    crystalCounter.className = 'life-crystal-counter';
+    const crystalButton = document.createElement('button');
+    crystalButton.type = 'button';
+    crystalButton.className = 'life-crystal-button';
+    crystalButton.setAttribute('aria-label', `プレイヤー${index + 1} Winning Crystal 0/3`);
+    const crystalGem = document.createElement('span');
+    crystalGem.className = 'life-crystal-gem';
+    crystalGem.setAttribute('aria-hidden', 'true');
+    crystalGem.textContent = '◇';
+    const crystalCount = document.createElement('span');
+    crystalCount.className = 'life-crystal-count';
+    crystalCount.setAttribute('aria-hidden', 'true');
+    crystalCount.textContent = '0';
+    crystalButton.append(crystalGem, crystalCount);
+    crystalButton.addEventListener('click', () => {
+      lifePlayerCrystals[index] = ((lifePlayerCrystals[index] || 0) + 1) % 4;
+      updateLifeCrystalButton();
+    });
+    crystalCounter.appendChild(crystalButton);
+
+    const updateLifeCrystalButton = () => {
+      const count = lifePlayerCrystals[index] || 0;
+      crystalButton.classList.toggle('is-earned', count > 0);
+      crystalButton.setAttribute('aria-label', `プレイヤー${index + 1} Winning Crystal ${count}/3`);
+      crystalCount.textContent = String(count);
+    };
+    updateLifeCrystalButton();
+
+    const itemTools = document.createElement('div');
+    itemTools.className = 'life-item-tools';
+    const itemButton = document.createElement('button');
+    itemButton.type = 'button';
+    itemButton.className = 'life-item-open-button';
+    itemButton.textContent = '▤';
+    itemButton.setAttribute('aria-label', `プレイヤー${index + 1}のアイテムを管理`);
+    itemButton.title = 'アイテム';
+    itemButton.addEventListener('click', () => openLifeItemManager(index));
+    const itemDisplay = document.createElement('div');
+    itemDisplay.className = 'life-item-display';
+    itemDisplay.setAttribute('aria-label', '所持アイテム');
+    itemTools.append(itemButton, itemDisplay);
 
     [-100, 100].forEach(amount => {
       const tapZone = document.createElement('button');
@@ -2782,8 +2959,9 @@ function renderLifeGame() {
       controls.appendChild(button);
     });
 
-    player.append(heading, value, controls, decreaseHint, increaseHint, increaseFeedback, decreaseFeedback);
+    player.append(heading, value, tapHints, controls, crystalCounter, itemTools, increaseFeedback, decreaseFeedback);
     board.appendChild(player);
+    updateLifeItemDisplay(index);
     fitLifeTotal(value);
   });
 }
@@ -2904,6 +3082,8 @@ function confirmReturnToSearch() {
 function resetLifeGame() {
   requestLifeConfirmation('全プレイヤーのライフを初期値にリセットしてよろしいですか？', () => {
     lifePlayerTotals = Array(lifeGameSettings.playerCount).fill(lifeGameSettings.startingLife);
+    lifePlayerCrystals = Array(lifeGameSettings.playerCount).fill(0);
+    lifePlayerItems = Array.from({ length: lifeGameSettings.playerCount }, () => LIFE_ITEM_TYPES.map(() => 0));
     renderLifeGame();
     closeLifeOptions();
   });
