@@ -62,6 +62,9 @@ let lifeFeedbackTotals = [];
 let lifeFeedbackTimers = [];
 let lifeTextMeasureContext = null;
 let lifeToolScrollY = null;
+let lifeToolHistoryEntryActive = false;
+let skipNextLifeToolPopstate = false;
+let lifePreviousViewportContent = null;
 let lifeConfirmAction = null;
 
 // ------------------------------------------------------------------------------------------------------------------
@@ -2654,7 +2657,19 @@ function applySortWithoutUrlUpdate() {
 }
 
 // ブラウザの「戻る」「進む」ボタン押下時のイベントリスナー
-window.addEventListener('popstate', () => {
+window.addEventListener('popstate', event => {
+  if (skipNextLifeToolPopstate) {
+    skipNextLifeToolPopstate = false;
+    return;
+  }
+  if (lifeToolHistoryEntryActive) {
+    closeLifeTool(true);
+    return;
+  }
+  if (event.state?.lifeTool) {
+    openLifeTool(true);
+    return;
+  }
   handleUrlState();
 });
 
@@ -2665,22 +2680,35 @@ window.addEventListener('popstate', () => {
 /**
  * ライフ計算ツールを開く関数
  */
-function openLifeTool() {
+function openLifeTool(fromHistory = false) {
+  const overlay = document.getElementById('life-tool-overlay');
+  if (!overlay.hidden) return;
   closeToolMenu();
+  if (!fromHistory) {
+    history.pushState({ ...(history.state || {}), lifeTool: true }, '', window.location.href);
+  }
+  lifeToolHistoryEntryActive = true;
   lifeToolScrollY = window.scrollY;
   document.body.style.position = 'fixed';
   document.body.style.top = `-${lifeToolScrollY}px`;
   document.body.style.width = '100%';
   document.documentElement.classList.add('life-tool-open');
   document.body.classList.add('life-tool-open');
-  document.getElementById('life-tool-overlay').hidden = false;
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+  if (viewportMeta && lifePreviousViewportContent === null) {
+    lifePreviousViewportContent = viewportMeta.content;
+    viewportMeta.content = `${lifePreviousViewportContent}, maximum-scale=1, user-scalable=no`;
+  }
+  overlay.hidden = false;
   showLifeSettings();
 }
 
 /**
  * ライフ計算ツールを閉じる関数
  */
-function closeLifeTool() {
+function closeLifeTool(fromHistory = false) {
+  const shouldGoBack = lifeToolHistoryEntryActive && !fromHistory;
+  lifeToolHistoryEntryActive = false;
   const overlay = document.getElementById('life-tool-overlay');
   if (overlay) overlay.hidden = true;
   document.getElementById('life-options').hidden = true;
@@ -2694,6 +2722,14 @@ function closeLifeTool() {
     document.body.classList.remove('life-tool-open');
     window.scrollTo(0, lifeToolScrollY);
     lifeToolScrollY = null;
+  }
+  if (lifePreviousViewportContent !== null) {
+    document.querySelector('meta[name="viewport"]').content = lifePreviousViewportContent;
+    lifePreviousViewportContent = null;
+  }
+  if (shouldGoBack) {
+    skipNextLifeToolPopstate = true;
+    history.back();
   }
 }
 
