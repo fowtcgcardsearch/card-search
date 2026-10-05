@@ -63,9 +63,14 @@ let lifeFeedbackTimers = [];
 let lifeTextMeasureContext = null;
 let lifeToolScrollY = null;
 let lifeToolHistoryEntryActive = false;
-let skipNextLifeToolPopstate = false;
+let lifeToolHistoryDepth = 0;
+let lifeToolHistoryState = null;
+let lifeToolCurrentView = null;
+let lifeToolSettingsTransitionPending = false;
+let lifeToolExitConfirmed = false;
 let lifePreviousViewportContent = null;
 let lifeConfirmAction = null;
+let lifeConfirmCancelAction = null;
 
 // ------------------------------------------------------------------------------------------------------------------
 // 初期表示用関数
@@ -105,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         closeLifeOptions();
         return;
       }
-      closeLifeTool();
+      confirmReturnToSearch();
     }
   });
 
@@ -2658,16 +2663,41 @@ function applySortWithoutUrlUpdate() {
 
 // ブラウザの「戻る」「進む」ボタン押下時のイベントリスナー
 window.addEventListener('popstate', event => {
-  if (skipNextLifeToolPopstate) {
-    skipNextLifeToolPopstate = false;
+  if (lifeToolExitConfirmed) {
+    lifeToolExitConfirmed = false;
+    closeLifeTool();
     return;
   }
-  if (lifeToolHistoryEntryActive) {
-    closeLifeTool(true);
+  if (lifeToolSettingsTransitionPending) {
+    lifeToolSettingsTransitionPending = false;
+    const settingsState = {
+      ...(event.state?.lifeTool ? event.state : {}),
+      lifeTool: true,
+      lifeView: 'settings',
+      lifeToolStep: 0
+    };
+    history.replaceState(settingsState, '', window.location.href);
+    lifeToolHistoryDepth = 1;
+    lifeToolHistoryState = settingsState;
+    showLifeToolView(settingsState);
     return;
   }
   if (event.state?.lifeTool) {
-    openLifeTool(true);
+    if (!lifeToolHistoryEntryActive) {
+      openLifeTool(true, event.state);
+    } else {
+      lifeToolHistoryDepth = (event.state.lifeToolStep || 0) + 1;
+      lifeToolHistoryState = event.state;
+      showLifeToolView(event.state);
+    }
+    return;
+  }
+  if (lifeToolHistoryEntryActive) {
+    requestLifeConfirmation(
+      'ゲームを終了して検索画面に戻ってよろしいですか？',
+      closeLifeTool,
+      restoreLifeToolHistory
+    );
     return;
   }
   handleUrlState();
@@ -2680,14 +2710,22 @@ window.addEventListener('popstate', event => {
 /**
  * ライフ計算ツールを開く関数
  */
-function openLifeTool(fromHistory = false) {
+function openLifeTool(fromHistory = false, historyState = null) {
   const overlay = document.getElementById('life-tool-overlay');
   if (!overlay.hidden) return;
   closeToolMenu();
+  const nextState = historyState || {
+    ...(history.state || {}),
+    lifeTool: true,
+    lifeView: 'settings',
+    lifeToolStep: 0
+  };
   if (!fromHistory) {
-    history.pushState({ ...(history.state || {}), lifeTool: true }, '', window.location.href);
+    history.pushState(nextState, '', window.location.href);
   }
   lifeToolHistoryEntryActive = true;
+  lifeToolHistoryDepth = (nextState.lifeToolStep || 0) + 1;
+  lifeToolHistoryState = nextState;
   lifeToolScrollY = window.scrollY;
   document.body.style.position = 'fixed';
   document.body.style.top = `-${lifeToolScrollY}px`;
@@ -2700,15 +2738,17 @@ function openLifeTool(fromHistory = false) {
     viewportMeta.content = `${lifePreviousViewportContent}, maximum-scale=1, user-scalable=no`;
   }
   overlay.hidden = false;
-  showLifeSettings();
+  showLifeToolView(nextState);
 }
 
 /**
  * ライフ計算ツールを閉じる関数
  */
-function closeLifeTool(fromHistory = false) {
-  const shouldGoBack = lifeToolHistoryEntryActive && !fromHistory;
+function closeLifeTool() {
   lifeToolHistoryEntryActive = false;
+  lifeToolHistoryDepth = 0;
+  lifeToolHistoryState = null;
+  lifeToolCurrentView = null;
   const overlay = document.getElementById('life-tool-overlay');
   if (overlay) overlay.hidden = true;
   document.getElementById('life-options').hidden = true;
@@ -2727,35 +2767,94 @@ function closeLifeTool(fromHistory = false) {
     document.querySelector('meta[name="viewport"]').content = lifePreviousViewportContent;
     lifePreviousViewportContent = null;
   }
-  if (shouldGoBack) {
-    skipNextLifeToolPopstate = true;
-    history.back();
-  }
 }
 
 function openLifeOptions() {
-  document.getElementById('life-game').hidden = true;
-  document.getElementById('life-options').hidden = false;
+  pushLifeToolView('options');
   document.getElementById('life-dice-result').hidden = true;
 }
 
 function closeLifeOptions() {
-  document.getElementById('life-options').hidden = true;
-  document.getElementById('life-game').hidden = false;
+  if (lifeToolCurrentView === 'options' && history.state?.lifeTool) {
+    history.back();
+    return;
+  }
+  showLifeToolView({ lifeTool: true, lifeView: 'game', lifeToolStep: Math.max(0, lifeToolHistoryDepth - 1) });
 }
 
 function openLifeItemManager(playerIndex) {
-  activeLifeItemPlayer = playerIndex;
-  document.getElementById('life-game').hidden = true;
-  document.getElementById('life-item-manager').hidden = false;
-  document.getElementById('life-item-manager-title').textContent = `PLAYER ${playerIndex + 1} アイテム`;
-  renderLifeItemManager();
+  pushLifeToolView('items', { lifePlayerIndex: playerIndex });
 }
 
 function closeLifeItemManager() {
-  document.getElementById('life-item-manager').hidden = true;
-  document.getElementById('life-game').hidden = false;
-  activeLifeItemPlayer = null;
+  if (lifeToolCurrentView === 'items' && history.state?.lifeTool) {
+    history.back();
+    return;
+  }
+  showLifeToolView({ lifeTool: true, lifeView: 'game', lifeToolStep: Math.max(0, lifeToolHistoryDepth - 1) });
+}
+
+function pushLifeToolView(view, extraState = {}) {
+  const nextState = {
+    ...(history.state?.lifeTool ? history.state : {}),
+    lifeTool: true,
+    lifeView: view,
+    lifeToolStep: lifeToolHistoryDepth,
+    ...extraState
+  };
+  history.pushState(nextState, '', window.location.href);
+  lifeToolHistoryDepth++;
+  lifeToolHistoryState = nextState;
+  showLifeToolView(nextState);
+}
+
+function replaceLifeToolView(view, extraState = {}) {
+  const nextState = {
+    ...(history.state?.lifeTool ? history.state : lifeToolHistoryState || {}),
+    lifeTool: true,
+    lifeView: view,
+    lifeToolStep: Math.max(0, lifeToolHistoryDepth - 1),
+    ...extraState
+  };
+  history.replaceState(nextState, '', window.location.href);
+  lifeToolHistoryState = nextState;
+  showLifeToolView(nextState);
+}
+
+function showLifeToolView(state) {
+  const view = state.lifeView || 'settings';
+  const settings = document.getElementById('life-settings');
+  const game = document.getElementById('life-game');
+  const options = document.getElementById('life-options');
+  const itemManager = document.getElementById('life-item-manager');
+  const header = document.querySelector('.life-tool-header');
+
+  lifeToolCurrentView = view;
+  options.hidden = view !== 'options';
+  itemManager.hidden = view !== 'items';
+  settings.hidden = view !== 'settings';
+  game.hidden = view !== 'game';
+  header.hidden = view === 'game' || view === 'options' || view === 'items';
+
+  if (view === 'items') {
+    activeLifeItemPlayer = state.lifePlayerIndex || 0;
+    document.getElementById('life-item-manager-title').textContent = `PLAYER ${activeLifeItemPlayer + 1} アイテム`;
+    renderLifeItemManager();
+  } else {
+    activeLifeItemPlayer = null;
+  }
+
+  if (view === 'game') {
+    requestAnimationFrame(() => {
+      document.querySelectorAll('#life-player-board .life-total').forEach(fitLifeTotal);
+    });
+  }
+}
+
+function restoreLifeToolHistory() {
+  if (!lifeToolHistoryState) return;
+  history.pushState(lifeToolHistoryState, '', window.location.href);
+  lifeToolHistoryDepth = (lifeToolHistoryState.lifeToolStep || 0) + 1;
 }
 
 function renderLifeItemManager() {
@@ -2879,9 +2978,7 @@ function startLifeGame() {
   lifePlayerCrystals = Array(lifeGameSettings.playerCount).fill(0);
   lifePlayerItems = Array.from({ length: lifeGameSettings.playerCount }, () => LIFE_ITEM_TYPES.map(() => 0));
   renderLifeGame();
-  document.getElementById('life-settings').hidden = true;
-  document.getElementById('life-game').hidden = false;
-  document.querySelector('.life-tool-header').hidden = true;
+  replaceLifeToolView('game');
   requestAnimationFrame(() => {
     document.querySelectorAll('#life-player-board .life-total').forEach(fitLifeTotal);
   });
@@ -3065,18 +3162,22 @@ function showLifeDelta(playerIndex, player, amount) {
  * ライフ計算ツールの設定を開く関数
  */
 function showLifeSettings() {
-  document.getElementById('life-options').hidden = true;
-  document.getElementById('life-game').hidden = true;
-  document.getElementById('life-settings').hidden = false;
-  document.querySelector('.life-tool-header').hidden = false;
+  if (lifeToolCurrentView === 'options' && lifeToolHistoryDepth > 1) {
+    lifeToolSettingsTransitionPending = true;
+    history.back();
+    return;
+  }
+  lifeToolHistoryDepth = 1;
+  replaceLifeToolView('settings', { lifeToolStep: 0 });
 }
 
 /**
  * ライフツールの確認ダイアログを開く関数
  */
-function requestLifeConfirmation(message, action) {
+function requestLifeConfirmation(message, action, cancelAction = null) {
   document.getElementById('life-confirm-message').textContent = message;
   lifeConfirmAction = action;
+  lifeConfirmCancelAction = cancelAction;
   document.getElementById('life-confirm-dialog').showModal();
 }
 
@@ -3086,6 +3187,7 @@ function requestLifeConfirmation(message, action) {
 function confirmLifeAction() {
   const action = lifeConfirmAction;
   lifeConfirmAction = null;
+  lifeConfirmCancelAction = null;
   document.getElementById('life-confirm-dialog').close();
   if (action) action();
 }
@@ -3094,8 +3196,11 @@ function confirmLifeAction() {
  * 確認ダイアログをキャンセルする関数
  */
 function cancelLifeConfirmation() {
+  const cancelAction = lifeConfirmCancelAction;
   lifeConfirmAction = null;
+  lifeConfirmCancelAction = null;
   document.getElementById('life-confirm-dialog').close();
+  if (cancelAction) cancelAction();
 }
 
 /**
@@ -3109,7 +3214,16 @@ function confirmShowLifeSettings() {
  * 確認後にライフ計算ツールを閉じ検索画面に戻る関数
  */
 function confirmReturnToSearch() {
-  requestLifeConfirmation('ゲームを中断して検索画面に戻ってよろしいですか？', closeLifeTool);
+  requestLifeConfirmation('ゲームを終了して検索画面に戻ってよろしいですか？', returnLifeToolToSearch);
+}
+
+function returnLifeToolToSearch() {
+  if (!lifeToolHistoryEntryActive) {
+    closeLifeTool();
+    return;
+  }
+  lifeToolExitConfirmed = true;
+  history.go(-lifeToolHistoryDepth);
 }
 
 /**
