@@ -1518,6 +1518,12 @@ function unescapeHtml(str) {
 // カード詳細表示用関数
 // ------------------------------------------------------------------------------------------------------------------
 
+function getCardSiblings(cardNo) {
+  return allCards
+    .filter(card => card.id === cardNo)
+    .sort((a, b) => String(a.uid).localeCompare(String(b.uid), 'ja', { numeric: true }));
+}
+
 /**
  * カード詳細画面のモジュール表示
  * @param {string} cardId 
@@ -1527,11 +1533,14 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
   // セッションにカードIDを保存
   const targetCard = allCards.find(c => c.uid === cardId);
   if (!targetCard) return;
+  const siblings = getCardSiblings(targetCard.id);
+  const siblingIndex = siblings.findIndex(card => card.uid === targetCard.uid);
+  const cardParam = siblingIndex > 0 ? `${targetCard.id}_${siblingIndex + 1}` : targetCard.id;
 
   // --- URLへのカードNo反映 ---
   if (!isFromUrl) {
     const url = new URL(window.location.href);
-    url.searchParams.set('card', targetCard.id); // カードNo（例: AO1-001）を付与
+    url.searchParams.set('card', cardParam);
     history.pushState(null, '', url.toString());
   }
 
@@ -1575,7 +1584,6 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
   }
 
   // 同じNo（id）を持つカードをすべて抽出する
-  const siblings = allCards.filter(c => c.id === targetCard.id);
   siblings.sort((a, b) => {
     if (a.uid === cardId) return -1; // aを先に持ってくる
     if (b.uid === cardId) return 1;  // bを先に持ってくる
@@ -1763,7 +1771,7 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
     modalContent += `
       <div class="modal-title">
         <h2 style="margin: 0; font-size: 20px; color: #1e293b;">${card.enName || '（No English Name）'}
-          <button type="button" class="copy-url-btn" onclick="copyCardUrl('${card.id}')" title="カードの個別URLをコピー">
+          <button type="button" class="copy-url-btn" onclick="copyCardUrl(${escapeHtml(JSON.stringify(card.id))}, ${escapeHtml(JSON.stringify(card.uid))})" title="カードの個別URLをコピー">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
@@ -1839,10 +1847,14 @@ function openDetail(cardId, isNavClick = false, isFromUrl = false) {
 /**
  * カード単体用URLをクリップボードにコピーする関数
  * @param {string} cardId - カードID (例: 'QSK-002')
+ * @param {string} cardUid - 個別面を特定するUID
  */
-function copyCardUrl(cardId) {
+function copyCardUrl(cardId, cardUid) {
   const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
-  const shareUrl = `${baseUrl}/card/${cardId}.html`;
+  const siblings = getCardSiblings(cardId);
+  const faceIndex = siblings.findIndex(card => card.uid === cardUid);
+  const numberedCardId = faceIndex > 0 ? `${cardId}_${faceIndex + 1}` : cardId;
+  const shareUrl = `${baseUrl}/card/${encodeURIComponent(numberedCardId)}.html`;
 
   // 1. モダンブラウザ（標準API）を試行
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2623,7 +2635,14 @@ function openDetailByUrl(params) {
   // カード詳細モーダルの制御
   const cardNo = params.get('card');
   if (cardNo) {
-    const targetCard = allCards.find(c => c.id === cardNo || c.uid === cardNo);
+    let targetCard = allCards.find(c => c.id === cardNo || c.uid === cardNo);
+    if (!targetCard) {
+      const numberedCardNo = cardNo.match(/^(.*)_(\d+)$/);
+      if (numberedCardNo) {
+        const siblingIndex = Number(numberedCardNo[2]) - 1;
+        targetCard = getCardSiblings(numberedCardNo[1])[siblingIndex] || null;
+      }
+    }
     if (targetCard) {
       openDetail(targetCard.uid, false, true);
     }

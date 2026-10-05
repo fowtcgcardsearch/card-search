@@ -367,8 +367,7 @@ async function build() {
 	const cardIndexById = new Map(orderedCardIds.map((cardId, index) => [cardId, index]));
 
 	for (const [cardId, groupedCards] of cardsById) {
-		const filename = `${cardId}.html`;
-		const url = `${SITE_ORIGIN}/card/${encodeURIComponent(filename)}`;
+		groupedCards.sort((a, b) => String(a.uid).localeCompare(String(b.uid), 'ja', { numeric: true }));
 		const index = cardIndexById.get(cardId);
 		const navigation = {
 			previousId: orderedCardIds[index - 1],
@@ -376,9 +375,14 @@ async function build() {
 			index,
 			total: orderedCardIds.length
 		};
-		await fs.writeFile(path.join(CARD_OUTPUT_DIR, filename), makeCardHtml(groupedCards, url, cardData.cards, keywords, cardHrefByName, cardReferenceMap, latestCardMap, cardByUid, raceMap, navigation), 'utf8');
-		sitemapEntries.push(`  <url><loc>${escapeHtml(url)}</loc></url>`);
-		generatedCount += 1;
+		for (let faceIndex = 0; faceIndex < groupedCards.length; faceIndex++) {
+			const filename = `${cardId}${faceIndex === 0 ? '' : `_${faceIndex + 1}`}.html`;
+			const url = `${SITE_ORIGIN}/card/${encodeURIComponent(filename)}`;
+			const orderedFaces = [groupedCards[faceIndex], ...groupedCards.filter((_, index) => index !== faceIndex)];
+			await fs.writeFile(path.join(CARD_OUTPUT_DIR, filename), makeCardHtml(orderedFaces, url, cardData.cards, keywords, cardHrefByName, cardReferenceMap, latestCardMap, cardByUid, raceMap, navigation), 'utf8');
+			sitemapEntries.push(`  <url><loc>${escapeHtml(url)}</loc></url>`);
+			generatedCount += 1;
+		}
 	}
 
 	const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
