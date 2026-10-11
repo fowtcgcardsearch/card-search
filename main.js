@@ -1017,8 +1017,8 @@ function searchImportedCards(isRestoring = false) {
 function applyFormatFilter() {
   const formatSelect = document.getElementById('format-select');
   const formatWrapper = document.getElementById('format-select-wrapper');
-  const hasParadoxCards = searchResultCards.some(card => String(card.paradox ?? '').trim() !== '');
-  const hasClusterCards = searchResultCards.some(card => String(card.paradox ?? '').trim() === '☆');
+  const hasParadoxCards = searchResultCards.some(card => String(card.paradox ?? '').trim() === 'p' || String(card.paradox ?? '').trim() === 'c');
+  const hasClusterCards = searchResultCards.some(card => String(card.paradox ?? '').trim() === 'c');
 
   if (formatWrapper) formatWrapper.hidden = !hasParadoxCards;
   const clusterOption = formatSelect?.querySelector('option[value="cluster"]');
@@ -1030,9 +1030,9 @@ function applyFormatFilter() {
 
   const format = formatSelect?.value || 'all';
   if (format === 'paradox') {
-    filteredCards = searchResultCards.filter(card => String(card.paradox ?? '').trim() !== '');
+    filteredCards = searchResultCards.filter(card => String(card.paradox ?? '').trim() === 'p' || String(card.paradox ?? '').trim() === 'c');
   } else if (format === 'cluster') {
-    filteredCards = searchResultCards.filter(card => String(card.paradox ?? '').trim() === '☆');
+    filteredCards = searchResultCards.filter(card => String(card.paradox ?? '').trim() === 'c');
   } else {
     filteredCards = [...searchResultCards];
   }
