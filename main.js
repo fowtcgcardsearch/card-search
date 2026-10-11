@@ -2619,7 +2619,7 @@ function handleUrlState() {
   }
 
   // 再描画（ソート適用等）
-  if (filteredCards.length > 0) {
+  if (filteredCards.length > 0 && state.tab !== 'import') {
     applySortWithoutUrlUpdate();
   }
 
