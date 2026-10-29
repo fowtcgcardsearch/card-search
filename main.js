@@ -138,6 +138,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+  const keywordModalContent = document.querySelector("#keyword-list-modal > div");
+  if (keywordModalContent) {
+    let lastTapTime = 0;
+    keywordModalContent.addEventListener("touchend", (event) => {
+      if (event.target.closest("button, a, input, select")) {
+        return;
+      }
+
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTapTime;
+
+      if (tapLength < 300 && tapLength > 0) {
+        closeKeywordModal();
+        event.preventDefault();
+      }
+      lastTapTime = currentTime;
+    });
+  }
   const modalContent = document.querySelector(".modal-content");
   if (modalContent) {
     modalContent.addEventListener("scroll", function() {
@@ -2088,9 +2106,10 @@ function closeModal(skipUrlUpdate = false) {
  */
 document.addEventListener('keydown', (e) => {
   const detailModal = document.getElementById("detail-modal");
+  const keywordModal = document.getElementById('keyword-list-modal');
   
   // モーダルが表示されていない場合は処理しない
-  if (!detailModal || detailModal.style.display !== "flex") return;
+  if ((!detailModal || detailModal.style.display !== "flex") && (!keywordModal || keywordModal.style.display !== "flex")) return;
 
   // テキスト入力中などはキーボードショートカットを無効化
   const activeEl = document.activeElement;
@@ -2100,6 +2119,10 @@ document.addEventListener('keydown', (e) => {
     const detailModal = document.getElementById("detail-modal");
     if (detailModal && detailModal.style.display === "flex") {
       closeModal();
+    }
+    const keywordModal = document.getElementById('keyword-list-modal');
+    if (keywordModal && keywordModal.style.display === "flex") {
+      closeKeywordModal();
     }
   }
 
@@ -2302,12 +2325,11 @@ function openKeywordModal() {
     // マスタの内容からHTMLを生成
     let html = '<ul style="list-style: none; padding-left: 0; margin: 0;">';
     for(let kw of keywords) {
-      if(kw.category === "キーワード")continue;
       html += `
         <li style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #eee;">
-          <strong style="font-size: 14px; color: #333; background: #f0f0f0; padding: 2px 6px; border-radius: 4px;">${kw.name}</strong> 
-          ${kw.jp ? `<span style="color: #666; font-size: 12px;">(${kw.jp})</span>` : ''}
-          <div style="font-size: 13px; color: #444; margin-top: 4px; padding-left: 6px; border-left: 3px solid #ccc;">${kw.description}</div>
+          <strong style="font-size: 14px; color: #333; background: #f0f0f0; padding: 2px 6px; border-radius: 4px;">${escapeHtml(kw.name)}</strong> 
+          ${kw.jp ? `<span style="color: #666; font-size: 12px;">(${escapeHtml(kw.jp)})</span>` : ''}
+          <div style="font-size: 13px; color: #444; margin-top: 4px; padding-left: 6px; border-left: 3px solid #ccc;">${escapeHtml(kw.description)}</div>
         </li>
       `;
     };
@@ -2315,7 +2337,7 @@ function openKeywordModal() {
     contentDiv.innerHTML = html;
   }
   // モーダルを表示
-  document.getElementById('keyword-list-modal').style.display = 'block';
+  document.getElementById('keyword-list-modal').style.display = 'flex';
 }
 
 // キーワードモーダルを閉じる関数

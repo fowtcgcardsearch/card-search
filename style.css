@@ -1435,6 +1435,7 @@ body.life-tool-open {
   transition: all 0.2s;
   margin-top: 12px;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .detail-btn:hover {
