@@ -74,7 +74,7 @@
 
 <!-- 基本検索用のフォームエリア -->
 <div id="basic-search-form" class="search-container">
-  <input type="text" id="search-input" placeholder="キーワードを入力" onkeydown="if(event.key==='Enter') searchCards()">
+  <input type="search" id="search-input" placeholder="キーワードを入力" onkeydown="if(event.key==='Enter') searchCards()">
   <button id="search-btn" onclick="searchCards()">検索</button>
 </div>
 
@@ -88,7 +88,7 @@
   <div id="detailed-inputs" style="display: flex; flex-direction: column; gap: 10px;">
     <div class="form-group">
       <label>キーワード</label>
-      <input type="text" id="det-text-input" placeholder="キーワードを入力" onkeydown="if(event.key==='Enter') searchDetailedCards()">
+      <input type="search" id="det-text-input" placeholder="キーワードを入力" onkeydown="if(event.key==='Enter') searchDetailedCards()">
       <label>検索モード</label>
       <select id="det-search-mode" style="margin-bottom: 10px;">
         <option value="exact">入力した通りの内容を含む</option>
