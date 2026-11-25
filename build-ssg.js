@@ -380,18 +380,14 @@ async function build() {
 			const url = `${SITE_ORIGIN}/card/${encodeURIComponent(filename)}`;
 			const orderedFaces = [groupedCards[faceIndex], ...groupedCards.filter((_, index) => index !== faceIndex)];
 			await fs.writeFile(path.join(CARD_OUTPUT_DIR, filename), makeCardHtml(orderedFaces, url, cardData.cards, keywords, cardHrefByName, cardReferenceMap, latestCardMap, cardByUid, raceMap, navigation), 'utf8');
-			sitemapEntries.push(`  <url><loc>${escapeHtml(url)}</loc></url>`);
-			generatedCount += 1;
-		}
-	}
+			      sitemapEntries.push(url);
+      generatedCount += 1;
+    }
+  }
 
-	const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${sitemapEntries.join('\n')}
-</urlset>
-`;
-	await fs.writeFile(path.join(ROOT_DIR, 'sitemap.xml'), sitemap, 'utf8');
-	console.log(`${generatedCount}件のカードHTMLとsitemap.xmlを生成しました。`);
+  const sitemap = `${sitemapEntries.join('\n')}\n`;
+  await fs.writeFile(path.join(ROOT_DIR, 'sitemap.txt'), sitemap, 'utf8');
+  console.log(`${generatedCount} 件のカードHTMLとsitemap.txtを生成しました。`);
 }
 
 build().catch((error) => {
